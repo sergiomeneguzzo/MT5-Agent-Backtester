@@ -1,141 +1,77 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="mt5-agent-backtester" width="100%">
+  <img src="docs/images/banner.svg" alt="AI-Agent-Backtester" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/sergiomeneguzzo/mt5-agent-backtester/actions/workflows/ci.yml"><img src="https://github.com/sergiomeneguzzo/mt5-agent-backtester/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/sergiomeneguzzo/AI-Agent-Backtester/actions/workflows/ci.yml"><img src="https://github.com/sergiomeneguzzo/AI-Agent-Backtester/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/MetaTrader%205-build%206230%2B-1f6feb" alt="MetaTrader 5 build 6230+">
-  <img src="https://img.shields.io/badge/MCP-server%20%2B%20client-8957e5" alt="MCP">
   <img src="https://img.shields.io/badge/dependencies-0-3fb950" alt="zero dependencies">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT"></a>
 </p>
 
-<p align="center">
-  <b>Backtests, optimizations and walk-forward analysis in the real MetaTrader 5 Strategy Tester,<br>
-  driven from Python, the command line or any AI agent (Claude Code, Cursor, Codex…).<br>
-  Your agent gets research tools only. It has no way to send an order.</b>
-</p>
+**AI-Agent-Backtester** lets you run backtests, optimizations and walk-forward analysis in the real
+MetaTrader 5 Strategy Tester from Python, from the terminal or from an AI agent such as Claude Code or Cursor.
+
+It talks to the MCP server that ships inside MetaTrader 5 (build 6230+) and exposes **backtesting only**:
+the tools that send real orders are blocked, so an agent can research strategies on your machine without
+being able to trade.
+
+<p align="center"><img src="docs/images/agent-session.svg" alt="An agent testing an EA through AI-Agent-Backtester" width="100%"></p>
 
 ---
 
-## Why this exists
+## Contents
 
-Since build 6230, MetaTrader 5 ships its own **MCP server**. This means that, for the first time, the
-Strategy Tester can be driven programmatically instead of by clicking through dialogs. The raw server is
-low-level, though, and it has some sharp edges:
-
-| Raw MT5 MCP server | mt5-agent-backtester |
-|---|---|
-| ~70 tools, including `trade_send_market_order`, `trade_close_single_position`… sitting next to the tester on the same terminal that may hold a **live account** | `trade_*` tools are **refused and hidden**. The bundled MCP server exposes 5 research tools only |
-| You hand-write `.ini` configs and `.set` files in Windows paths | `tester.backtest("Examples/Moving Average/Moving Average", "EURUSD", "H1", …)` |
-| The deal list exists only as an `.xlsx` file inside the terminal folder, with UTF-16 parts | Parsed into `Deal` / `Trade` objects, an equity curve and yearly returns, using the stdlib only |
-| Optimization results come as SpreadsheetML; the JSON API omits the input values | Every pass comes with its parameters, plus `best(by=…, min_trades=…)` and a heatmap |
-| No walk-forward | Rolling or anchored **walk-forward**: the winner of each in-sample window is traded on the next out-of-sample window |
-| Every run leaves temp files and an open chart behind | Temp `.ini/.set/.xlsx` are deleted; only the bare charts *that run* opened are closed |
-| Huge JSON answers fill an agent's context | Compact summaries designed for LLM context windows |
-
-The goal: **an agent can do honest strategy research on your machine without you babysitting the terminal,
-and without any chance of it touching real money.**
+1. [Requirements](#requirements)
+2. [Setup in 4 steps](#setup-in-4-steps)
+3. [Your first backtest](#your-first-backtest)
+4. [Use it from an AI agent](#use-it-from-an-ai-agent)
+5. [Command reference](#command-reference)
+6. [Python API](#python-api)
+7. [Configuration](#configuration)
+8. [Troubleshooting](#troubleshooting)
+9. [How it works](#how-it-works)
+10. [Extending](#extending)
+11. [Development](#development)
 
 ---
 
-## See it work
+## Requirements
 
-### An agent researching an EA
+- **MetaTrader 5, build 6230 or newer** (Windows, or macOS through the official MetaQuotes installer)
+- **Python 3.10+**
+- The EA you want to test, compiled (`.ex5`) inside the terminal's `MQL5\Experts` folder
 
-<p align="center"><img src="docs/images/agent-session.svg" alt="Claude Code using the mt5-backtester MCP tools" width="100%"></p>
+The examples below use *Moving Average*, the sample EA that comes with every MetaTrader 5 install, so you
+can try everything without writing any code.
 
-> The transcript is laid out for readability. The tool arguments and every number in the tool results come
-> from a real run of the bundled MCP server against MetaTrader 5 (MetaQuotes' own *Moving Average* example
-> EA, EURUSD H1, 2020–2025).
+---
 
-### One backtest from the terminal
+## Setup in 4 steps
 
-<p align="center"><img src="docs/images/terminal-backtest.svg" alt="mt5agent backtest output" width="85%"></p>
+**1. Turn on the MCP server in MetaTrader 5**
 
-`--plot equity.png` produces this chart from the parsed deals:
+Open **Tools → Options → MCP**, enable the server and click **Generate** to create a key.
+Copy the key, then **restart MetaTrader 5** (a new key is only accepted after a restart).
 
-<p align="center"><img src="docs/images/equity.png" alt="Equity curve and drawdown of the Moving Average example EA" width="100%"></p>
-
-### Optimization + heatmap
-
-<p align="center"><img src="docs/images/terminal-optimize.svg" alt="mt5agent optimize output" width="90%"></p>
-<p align="center"><img src="docs/images/heatmap.png" alt="Profit factor heatmap MovingPeriod × MovingShift" width="100%"></p>
-
-The heatmap shows why the "best pass" is a trap. A few green cells sit inside a sea of red, so the edge
-is not stable across neighbouring parameters. That is exactly what **walk-forward** is for:
+**2. Install**
 
 ```bash
-mt5agent walkforward "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2026-01-01 \
-    -p MovingPeriod=10:100:10 -p MovingShift=0:10:2 --is-months 24 --oos-months 12 --plot wf.png
+pip install "ai-agent-backtester[plot] @ git+https://github.com/sergiomeneguzzo/AI-Agent-Backtester"
 ```
 
-The command re-optimizes on each 2-year window, trades the winner blind on the following year, and stitches
-those out-of-sample years into a single equity curve. It reports the out-of-sample profit factor, how many
-folds were profitable and the **walk-forward efficiency** (OOS profit per month ÷ IS profit per month).
+The `[plot]` extra adds charts. Leave it out if you only need the numbers.
 
----
+**3. Add your key**
 
-## Architecture
-
-<p align="center"><img src="docs/images/architecture.svg" alt="Architecture: agents → mt5agent → MetaTrader 5 MCP server → Strategy Tester" width="100%"></p>
-
-```
-src/mt5agent/
-├── config.py          connection settings and defaults, the only file you need to touch
-├── client.py          MT5Client: JSON-RPC over HTTP, session handling, trade_* guard
-├── tester.py          Tester: backtest(), optimize(), walk_forward(), cleanup
-├── walkforward.py     fold generation, stitched out-of-sample result, efficiency
-├── inputs.py          Range() and native .set lines
-├── metrics.py         profit factor, drawdown, yearly returns
-├── reports/
-│   ├── backtest.py    .xlsx report -> deals, trades, equity curve
-│   └── optimization.py  SpreadsheetML -> passes with their inputs
-├── cli/
-│   ├── commands.py    one function per `mt5agent` command
-│   └── output.py      tables, colors, --json
-├── mcp/
-│   ├── tools.py       one function per agent tool
-│   └── server.py      stdio JSON-RPC loop
-└── plots.py           optional matplotlib charts
-```
-
-The core needs **no third-party packages**: `urllib`, `zipfile` and `xml.etree` only. `matplotlib`/`pandas`
-are an optional extra, needed for charts and DataFrames.
-
----
-
-## Quick start
-
-### 1. Enable the MCP server in MetaTrader 5
-
-1. Update MetaTrader 5 to **build 6230 or newer**.
-2. In the terminal, open **Tools → Options → MCP**, tick *Enable internal server* and click **Generate** to
-   create an access key.
-3. **Restart MetaTrader 5**. A newly generated key is only accepted after a restart (until then you get `401`).
-4. Keep the terminal open while you work: the server lives inside it and listens on `127.0.0.1:22346` only.
-
-> For extra peace of mind, run backtests on a terminal logged into a **demo** account.
-
-### 2. Install
+Create a file called `.env` in the folder you work from:
 
 ```bash
-pip install "mt5-agent-backtester[plot] @ git+https://github.com/sergiomeneguzzo/mt5-agent-backtester"
-# or, from a clone:
-git clone https://github.com/sergiomeneguzzo/mt5-agent-backtester && cd mt5-agent-backtester
-pip install -e ".[plot]"
+MT5_MCP_KEY=paste-your-key-here
 ```
 
-### 3. Configure the key
-
-```bash
-cp .env.example .env      # then paste your key into MT5_MCP_KEY
-```
-
-See [Configuration](#configuration) for every option.
-
-### 4. Check the connection
+**4. Check the connection** (MetaTrader 5 must be open)
 
 ```bash
 mt5agent doctor
@@ -152,61 +88,114 @@ can_run_optimization  True
 trading_tools         blocked
 ```
 
----
-
-## Configuration
-
-Everything that depends on your machine lives in [`src/mt5agent/config.py`](src/mt5agent/config.py) and can be
-overridden from the environment or a `.env` file (environment wins, `.env` is searched upward from the
-current directory).
-
-| Variable | Default | Used for |
-|---|---|---|
-| `MT5_MCP_URL` | `http://127.0.0.1:22346/mcp` | terminal MCP server |
-| `MT5_MCP_KEY` | *(required)* | key generated in Tools > Options > MCP |
-| `MT5_MCP_TIMEOUT` | `3600` | HTTP timeout in seconds (long optimizations) |
-| `METAEDITOR_MCP_URL` / `METAEDITOR_MCP_KEY` | `http://127.0.0.1:22345/mcp` | MetaEditor server, optional |
-
-Tester defaults (`DEFAULT_MODEL`, `DEFAULT_DEPOSIT`, `DEFAULT_LEVERAGE`, `FILE_PREFIX`) sit at the top of the same
-file and are shared by the Python API, the CLI and the MCP server. In code you can skip the environment
-entirely:
-
-```python
-from mt5agent import MT5Client, Settings
-
-client = MT5Client(Settings(url="http://127.0.0.1:22346/mcp", key="..."))
-```
-
-The key is excluded from `repr()`, so it never ends up in logs or tracebacks.
+That's it.
 
 ---
 
-## Command line
-
-Every command accepts `--json`, which makes it easy to call from scripts and agents.
+## Your first backtest
 
 ```bash
-mt5agent experts --filter Moving                       # compiled EAs the tester can see
-mt5agent inputs "Examples/Moving Average/Moving Average"
-
-# one backtest (fixed inputs with -p Name=value)
-mt5agent backtest "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2025-12-31 \
-    -p MovingPeriod=12 --model "real ticks" --deposit 10000 --plot equity.png --save report.xlsx
-
-# optimization (ranges with -p Name=start:stop:step)
-mt5agent optimize "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2025-12-31 \
-    -p MovingPeriod=10:100:10 -p MovingShift=0:10:2 --criterion profit_factor --plot heatmap.png
-
-# walk-forward
-mt5agent walkforward "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2026-01-01 \
-    -p MovingPeriod=10:100:10 --is-months 24 --oos-months 6 --min-trades 50
-
-# offline: parse a report you already have (no terminal needed)
-mt5agent report report.xlsx
+mt5agent backtest "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2025-12-31 --plot equity.png
 ```
 
-Tick models: `open prices`, `m1 ohlc`, `every tick`, `real ticks`, `math calculations`.
-Expert paths are relative to `MQL5\Experts` (no extension). Absolute `C:\…\X.ex5` paths also work.
+The arguments are: **EA**, **symbol**, **timeframe**, **start date**, **end date**. The EA path is relative to
+`MQL5\Experts`, without the `.ex5` extension.
+
+<p align="center"><img src="docs/images/terminal-backtest.svg" alt="Backtest output" width="85%"></p>
+<p align="center"><img src="docs/images/equity.png" alt="Equity curve and drawdown" width="100%"></p>
+
+**Change the EA inputs** with `-p Name=value`:
+
+```bash
+mt5agent backtest "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2025-12-31 -p MovingPeriod=20
+```
+
+**Optimize** by giving a range with `-p Name=start:stop:step`:
+
+```bash
+mt5agent optimize "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2025-12-31 \
+    -p MovingPeriod=10:100:10 -p MovingShift=0:10:2 --plot heatmap.png
+```
+
+<p align="center"><img src="docs/images/terminal-optimize.svg" alt="Optimization output" width="90%"></p>
+<p align="center"><img src="docs/images/heatmap.png" alt="Profit factor heatmap" width="100%"></p>
+
+**Check that the result holds up** with a walk-forward: it re-optimizes on every 2-year window, trades the
+winner on the following year it has never seen, and joins those years together.
+
+```bash
+mt5agent walkforward "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-01 2026-01-01 \
+    -p MovingPeriod=10:100:10 -p MovingShift=0:10:2 --is-months 24 --oos-months 12 --plot walkforward.png
+```
+
+> The numbers in these images are a real run of the sample EA (EURUSD H1, 2020–2025, open prices).
+> It loses money, which is what makes it a useful example.
+
+---
+
+## Use it from an AI agent
+
+The install also adds `mt5agent-mcp`, an MCP server you can plug into any agent.
+
+**Claude Code**
+
+```bash
+claude mcp add mt5-backtester -e MT5_MCP_KEY=paste-your-key-here -- mt5agent-mcp
+```
+
+**Cursor, Windsurf or any other MCP client**: add this to the client's MCP config file.
+
+```json
+{
+  "mcpServers": {
+    "mt5-backtester": {
+      "command": "mt5agent-mcp",
+      "env": { "MT5_MCP_KEY": "paste-your-key-here" }
+    }
+  }
+}
+```
+
+Then just ask, for example: *"Backtest the Moving Average EA on EURUSD H1 from 2020 to 2025, then check whether
+optimizing MovingPeriod helps out-of-sample."*
+
+The agent gets these tools:
+
+| Tool | What it does |
+|---|---|
+| `list_experts` | lists the compiled EAs |
+| `expert_inputs` | shows an EA's inputs, version and build time |
+| `run_backtest` | one backtest: profit, profit factor, drawdown, trades, yearly returns |
+| `run_optimization` | grid of inputs: number of profitable passes and the best ones |
+| `run_walk_forward` | walk-forward: parameters per window and the out-of-sample result |
+
+[`examples/claude_code/CLAUDE.md`](examples/claude_code/CLAUDE.md) is a ready-made set of instructions you
+can drop into your project so the agent follows good testing habits.
+
+---
+
+## Command reference
+
+Add `--json` before any command to get machine-readable output.
+
+| Command | Example |
+|---|---|
+| `doctor` | `mt5agent doctor` |
+| `experts` | `mt5agent experts --filter Moving` |
+| `inputs` | `mt5agent inputs "Examples/Moving Average/Moving Average"` |
+| `backtest` | `mt5agent backtest <EA> <SYMBOL> <TF> <START> <END> [-p Name=value] [--plot file.png] [--save report.xlsx]` |
+| `optimize` | `mt5agent optimize <EA> <SYMBOL> <TF> <START> <END> -p Name=start:stop:step [--criterion profit_factor]` |
+| `walkforward` | `mt5agent walkforward <EA> <SYMBOL> <TF> <START> <END> -p Name=start:stop:step [--is-months 24 --oos-months 6]` |
+| `report` | `mt5agent report report.xlsx` (reads a saved report, MetaTrader 5 not needed) |
+| `tools` | `mt5agent tools` (MCP tools of the terminal, trading tools hidden) |
+
+Options shared by `backtest`, `optimize` and `walkforward`:
+
+| Option | Default | Values |
+|---|---|---|
+| `--model` | `open prices` | `open prices`, `m1 ohlc`, `every tick`, `real ticks` |
+| `--deposit` | `10000` | any amount |
+| `--leverage` | `100` | any integer |
 
 ---
 
@@ -215,74 +204,106 @@ Expert paths are relative to `MQL5\Experts` (no extension). Absolute `C:\…\X.e
 ```python
 from mt5agent import MT5Client, Range, Tester
 
-tester = Tester(MT5Client.connect())          # trade_* tools blocked by default
+tester = Tester(MT5Client.connect())
 
-# 1. Backtest
-run = tester.backtest("Examples/Moving Average/Moving Average",
-                      symbol="EURUSD", timeframe="H1",
-                      start="2020-01-01", end="2025-12-31",
-                      model="open prices", inputs={"MovingPeriod": 12})
-run.stats["profit_factor"]       # 0.8815  ← straight from MT5
-run.report.trades[:3]            # [Trade(close_time=…, side='long', net=…, balance=…), …]
-run.report.summary()             # trades, net, PF, win rate, max DD, recovery factor
-run.report.to_dataframe()        # every deal as a pandas DataFrame
+run = tester.backtest("Examples/Moving Average/Moving Average", "EURUSD", "H1", "2020-01-01", "2025-12-31",
+                      inputs={"MovingPeriod": 12})
+run.stats["profit_factor"]        # numbers from MetaTrader 5
+run.report.trades                 # every closed trade
+run.report.yearly_returns()       # {2020: 1.32, 2021: -8.7, ...}
 
-# 2. Optimize
-opt = tester.optimize("Examples/Moving Average/Moving Average", "EURUSD", "H1",
-                      "2020-01-01", "2025-12-31",
-                      inputs={"MovingPeriod": Range(10, 100, 10), "MovingShift": Range(0, 10, 2)},
-                      criterion="profit_factor")       # genetic switches on automatically above 10k combos
+opt = tester.optimize("Examples/Moving Average/Moving Average", "EURUSD", "H1", "2020-01-01", "2025-12-31",
+                      inputs={"MovingPeriod": Range(10, 100, 10), "MovingShift": Range(0, 10, 2)})
 opt.result.best(by="Profit Factor", min_trades=200)
 
-# 3. Walk-forward
-wf = tester.walk_forward("Examples/Moving Average/Moving Average", "EURUSD", "H1",
-                         "2020-01-01", "2026-01-01",
-                         inputs={"MovingPeriod": Range(10, 100, 10)},
-                         is_months=24, oos_months=12, min_trades=100)
-wf.summary()   # {'profit_factor': …, 'profitable_folds': …, 'efficiency': …, …}
+wf = tester.walk_forward("Examples/Moving Average/Moving Average", "EURUSD", "H1", "2020-01-01", "2026-01-01",
+                         inputs={"MovingPeriod": Range(10, 100, 10)}, is_months=24, oos_months=12)
+wf.summary()
 ```
 
-More in [`examples/`](examples/).
+Complete scripts are in [`examples/`](examples/).
 
 ---
 
-## Use it from an AI agent
+## Configuration
 
-The package installs a second command, **`mt5agent-mcp`**: a stdio MCP server that wraps everything above
-into five tools.
+Everything machine-specific is in **one file**: [`src/mt5agent/config.py`](src/mt5agent/config.py).
+You normally don't edit it: set the values in `.env` or as environment variables instead.
 
-| Tool | What the agent gets back |
-|---|---|
-| `list_experts` | compiled EAs with path and build time |
-| `expert_inputs` | input names, types and defaults (the agent can check the EA version before testing) |
-| `run_backtest` | net profit, PF, trades, equity DD, recovery, Sharpe, **yearly returns** |
-| `run_optimization` | grid size, number of profitable passes, top N passes with parameters |
-| `run_walk_forward` | parameters chosen in each fold + the stitched out-of-sample summary |
+| Variable | Default | Meaning |
+|---|---|---|
+| `MT5_MCP_KEY` | *(required)* | key from Tools → Options → MCP |
+| `MT5_MCP_URL` | `http://127.0.0.1:22346/mcp` | address of the terminal's MCP server |
+| `MT5_MCP_TIMEOUT` | `3600` | seconds to wait for long optimizations |
+| `METAEDITOR_MCP_URL`, `METAEDITOR_MCP_KEY` | `http://127.0.0.1:22345/mcp` | MetaEditor server (optional) |
 
-Optimization ranges are passed as `{"MovingPeriod": [10, 100, 10]}`. Tool errors (bad EA path, missing
-symbol, timeout) go back to the agent as `isError` results, so it can correct itself instead of crashing.
+A template is in [`.env.example`](.env.example). Environment variables take priority over `.env`, and `.env`
+is searched for from the current folder upward.
 
-**Claude Code**
+Defaults for model, deposit, leverage and the prefix of temporary files are at the top of the same
+`config.py`. You can also pass the settings directly in code:
 
-```bash
-claude mcp add mt5-backtester -e MT5_MCP_KEY=<your-key> -- mt5agent-mcp
+```python
+from mt5agent import MT5Client, Settings
+
+client = MT5Client(Settings(url="http://127.0.0.1:22346/mcp", key="..."))
 ```
 
-or commit [`examples/claude_code/.mcp.json`](examples/claude_code/.mcp.json) to your project. The
-[`CLAUDE.md`](examples/claude_code/CLAUDE.md) next to it teaches the agent good habits: walk-forward before
-saying "robust", real ticks for final numbers, flagging small samples.
+---
 
-**Cursor / Windsurf / any MCP client:** add the same `command: "mt5agent-mcp"` entry to the client's MCP
-config.
+## Troubleshooting
+
+| Message | Fix |
+|---|---|
+| `MT5_MCP_KEY is not set` | create `.env` with your key (step 3) |
+| `Cannot reach http://127.0.0.1:22346/mcp` | open MetaTrader 5 and check that MCP is enabled in Tools → Options → MCP |
+| `401 Unauthorized` | the key is wrong, or you generated a new one and haven't restarted MetaTrader 5 |
+| an error about the `.ex5` path | the EA path is wrong: run `mt5agent experts` to see the exact names |
+| a test takes longer than expected | real-tick tests on many years are slow, so try `--model "open prices"` first |
+
+---
+
+## How it works
+
+<p align="center"><img src="docs/images/architecture.svg" alt="Architecture" width="100%"></p>
+
+For each run the library writes a tester config and an inputs file inside `MQL5\Profiles\Tester`, starts the
+test, waits for it, downloads the report and reads every deal. It then deletes its temporary files and closes
+any chart the test opened.
+
+**Safety**
+
+- Tools starting with `trade_` are refused and hidden. Enabling them requires
+  `MT5Client(..., allow_trading=True)` in your own code. The agent server never does this.
+- The MCP server only listens on `127.0.0.1`.
+- The key is never printed. It is left out of `repr()`, logs and tracebacks.
+- Broker server, company and account fields are removed from parsed reports.
+- Only charts that appeared during the run and have nothing attached are closed. Charts running an EA are
+  never touched.
+
+**Project layout**
+
+```
+src/mt5agent/
+├── config.py        settings and defaults
+├── client.py        connection to the MetaTrader 5 MCP server
+├── tester.py        backtest, optimize, walk_forward
+├── walkforward.py   in-sample / out-of-sample windows
+├── inputs.py        EA inputs and optimization ranges
+├── metrics.py       profit factor, drawdown, yearly returns
+├── reports/         readers for the .xlsx and .xml reports
+├── cli/             the mt5agent command
+├── mcp/             the mt5agent-mcp server for agents
+└── plots.py         charts
+```
 
 ---
 
 ## Extending
 
-Agent tools and CLI commands are plain functions registered with a decorator, so adding one does not touch
-the protocol or argument-parsing code.
+Commands and agent tools are plain functions with a decorator, so you add one without touching anything else.
 
-A new MCP tool, in [`mcp/tools.py`](src/mt5agent/mcp/tools.py):
+New agent tool, in [`src/mt5agent/mcp/tools.py`](src/mt5agent/mcp/tools.py):
 
 ```python
 @tool("compare_models", "Run the same backtest with open prices and real ticks.", run_schema())
@@ -292,76 +313,33 @@ def compare_models(tester: Tester, args: dict) -> dict:
     return {m: run.summary() for m, run in runs.items()}
 ```
 
-A new CLI command, in [`cli/commands.py`](src/mt5agent/cli/commands.py):
+New command, in [`src/mt5agent/cli/commands.py`](src/mt5agent/cli/commands.py):
 
 ```python
 @command("charts", "list open charts")
 def charts(ctx: Context) -> None:
     items = ctx.client.call("list_open_charts").get("charts", [])
-    ctx.out.json(items) if ctx.out.as_json else ctx.out.table(("id", "symbol"), [(c["chart_id"], c["symbol"]) for c in items])
+    ctx.out.table(("id", "symbol"), [(c["chart_id"], c["symbol"]) for c in items])
 ```
-
----
-
-## Safety model
-
-- **No trading, by construction.** `MT5Client.call()` raises `TradingBlockedError` for any `trade_*` tool
-  and `tools()` does not list them. Opting in requires `MT5Client(..., allow_trading=True)` in your own code.
-  The agent-facing MCP server never does this and has no tool that could.
-- **Local only.** The MT5 server binds to `127.0.0.1`, and the key travels only in the `Authorization`
-  header to that address.
-- **Secrets stay secret.** Keys come from the environment or `.env` (git-ignored) and are masked in `repr`.
-- **Private report fields are stripped.** The parser drops broker server, company and account fields from
-  report headers unless you pass `keep_private=True`.
-- **Leaves the terminal as it found it.** Every run writes its config to a uniquely named file, deletes its
-  `.ini`/`.set`/report files afterwards, and closes only charts that appeared *during the run* with nothing
-  attached. Charts running a live EA are never touched.
-
----
-
-## Lessons learned about the MT5 MCP server
-
-Things you would otherwise discover the hard way. The library handles all of them:
-
-- `get_workspace_info` **must** be the first call of every session.
-- A regenerated key gives `401` until the terminal is restarted.
-- `tester_get_report(file_format="xml")` writes **`.xlsx`** for single backtests and **SpreadsheetML `.xml`**
-  for optimizations. Parts of the `.xlsx` are UTF-16 encoded.
-- The JSON optimization report has metrics but **no input values**. Those only exist in the XML.
-- Tester dates have daily granularity, and `to_date` must be at least one day after `from_date`.
-- `wait: true` gives up after `timeout_sec`, but the test keeps running. You have to keep calling `tester_wait`.
-- Optimization `.set` lines follow `Name=value||start||step||stop||Y`.
-- On macOS the terminal runs under Wine. Paths are still Windows paths (`C:\Program Files\MetaTrader 5\MQL5`),
-  and everything works the same over MCP.
 
 ---
 
 ## Development
 
 ```bash
+git clone https://github.com/sergiomeneguzzo/AI-Agent-Backtester
+cd AI-Agent-Backtester
 pip install -e ".[dev]"
-pytest -q          # 38 tests, no terminal needed: a fake MCP transport replays real MT5 output
-ruff check src tests
+pytest -q
 ```
 
-The test fixtures come from a real Strategy Tester run, with the broker name removed.
-[`docs/run_demo.py`](docs/run_demo.py) re-runs the demo against a live terminal, and
-[`docs/make_images.py`](docs/make_images.py) regenerates every image in this README from those outputs.
+The 38 tests run without MetaTrader 5: a fake server replays real Strategy Tester output.
+`docs/run_demo.py` and `docs/make_images.py` regenerate the images in this README from a live terminal.
 
-## Roadmap
+**Roadmap**: multi-symbol portfolios, Monte Carlo on out-of-sample trades, compiling `.mq5` before testing,
+real-tick vs OHLC comparison, PyPI release.
 
-- [ ] Multi-symbol runs and portfolio stitching
-- [ ] Monte Carlo on the stitched out-of-sample trades
-- [ ] Compile `.mq5` through the MetaEditor MCP server before testing (`--compile`)
-- [ ] Real-tick vs OHLC drift report (same EA, two models, side by side)
-- [ ] Publish to PyPI
+---
 
-## Disclaimer
-
-This is a research tool. Backtests, including walk-forward ones, do not guarantee future results. Nothing
-in this repository is financial advice. The numbers shown come from MetaQuotes' public example EA and
-illustrate the tool, not a strategy.
-
-## License
-
-[MIT](LICENSE) © Sergio Meneguzzo
+Backtests do not guarantee future results and nothing here is financial advice.
+[MIT License](LICENSE) © Sergio Meneguzzo

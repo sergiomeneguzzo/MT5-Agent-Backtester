@@ -82,7 +82,7 @@ class MT5Client:
         self._rpc("initialize", {
             "protocolVersion": PROTOCOL_VERSION,
             "capabilities": {},
-            "clientInfo": {"name": "mt5-agent-backtester", "version": __version__},
+            "clientInfo": {"name": "ai-agent-backtester", "version": __version__},
         })
         self._post({"jsonrpc": "2.0", "method": "notifications/initialized"})
         return self.call("get_workspace_info")

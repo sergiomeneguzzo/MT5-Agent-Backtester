@@ -3,7 +3,7 @@ requires = ["hatchling>=1.24"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mt5-agent-backtester"
+name = "ai-agent-backtester"
 version = "0.1.0"
 description = "Let AI agents run MetaTrader 5 backtests, optimizations and walk-forward analysis through MT5's built-in MCP server — backtest-only, no trading tools."
 readme = "README.md"
@@ -30,8 +30,8 @@ mt5agent = "mt5agent.cli:main"
 mt5agent-mcp = "mt5agent.mcp:main"
 
 [project.urls]
-Homepage = "https://github.com/sergiomeneguzzo/mt5-agent-backtester"
-Issues = "https://github.com/sergiomeneguzzo/mt5-agent-backtester/issues"
+Homepage = "https://github.com/sergiomeneguzzo/AI-Agent-Backtester"
+Issues = "https://github.com/sergiomeneguzzo/AI-Agent-Backtester/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/mt5agent"]
