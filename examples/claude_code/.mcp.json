@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "mt5-backtester": {
+      "command": "mt5agent-mcp",
+      "env": {
+        "MT5_MCP_URL": "http://127.0.0.1:22346/mcp",
+        "MT5_MCP_KEY": "${MT5_MCP_KEY}"
+      }
+    }
+  }
+}

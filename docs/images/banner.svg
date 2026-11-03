@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#0d1117" stop-opacity="1"/>
+      <stop offset="0.55" stop-color="#0d1117" stop-opacity="0.2"/>
+      <stop offset="1" stop-color="#0d1117" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="16" fill="url(#bg)"/>
+  <!-- grid -->
+  <g stroke="#21262d" stroke-width="1">
+    <line x1="0" y1="80" x2="1280" y2="80"/><line x1="0" y1="160" x2="1280" y2="160"/>
+    <line x1="0" y1="240" x2="1280" y2="240"/>
+  </g>
+  <!-- candles -->
+  <g stroke-width="2">
+    <g stroke="#3fb950" fill="#3fb950">
+      <line x1="700" y1="200" x2="700" y2="260"/><rect x="694" y="214" width="12" height="34"/>
+      <line x1="760" y1="170" x2="760" y2="236"/><rect x="754" y="184" width="12" height="40"/>
+      <line x1="850" y1="130" x2="850" y2="196"/><rect x="844" y="140" width="12" height="44"/>
+      <line x1="910" y1="96" x2="910" y2="160"/><rect x="904" y="108" width="12" height="40"/>
+      <line x1="1030" y1="70" x2="1030" y2="140"/><rect x="1024" y="80" width="12" height="48"/>
+      <line x1="1150" y1="40" x2="1150" y2="110"/><rect x="1144" y="50" width="12" height="44"/>
+      <line x1="1210" y1="30" x2="1210" y2="90"/><rect x="1204" y="38" width="12" height="36"/>
+    </g>
+    <g stroke="#f85149" fill="#f85149">
+      <line x1="730" y1="196" x2="730" y2="250"/><rect x="724" y="206" width="12" height="28"/>
+      <line x1="790" y1="168" x2="790" y2="226"/><rect x="784" y="178" width="12" height="30"/>
+      <line x1="820" y1="176" x2="820" y2="232"/><rect x="814" y="186" width="12" height="26"/>
+      <line x1="880" y1="120" x2="880" y2="176"/><rect x="874" y="130" width="12" height="28"/>
+      <line x1="940" y1="100" x2="940" y2="170"/><rect x="934" y="110" width="12" height="40"/>
+      <line x1="970" y1="116" x2="970" y2="180"/><rect x="964" y="128" width="12" height="34"/>
+      <line x1="1000" y1="96" x2="1000" y2="150"/><rect x="994" y="104" width="12" height="30"/>
+      <line x1="1060" y1="74" x2="1060" y2="132"/><rect x="1054" y="84" width="12" height="30"/>
+      <line x1="1090" y1="80" x2="1090" y2="146"/><rect x="1084" y="92" width="12" height="36"/>
+      <line x1="1120" y1="60" x2="1120" y2="120"/><rect x="1114" y="70" width="12" height="30"/>
+      <line x1="1180" y1="44" x2="1180" y2="104"/><rect x="1174" y="56" width="12" height="28"/>
+    </g>
+  </g>
+  <polyline fill="none" stroke="#58a6ff" stroke-width="2.5" stroke-dasharray="6 6"
+            points="690,232 760,206 820,198 880,152 940,132 1000,120 1060,100 1120,86 1180,70 1230,56"/>
+  <rect width="1280" height="320" rx="16" fill="url(#fade)"/>
+  <!-- text -->
+  <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="64" y="92" fill="#58a6ff" font-size="20" font-weight="600" letter-spacing="3">METATRADER 5 · MCP · AI AGENTS</text>
+    <text x="64" y="160" fill="#f0f6fc" font-size="58" font-weight="800">mt5-agent-backtester</text>
+    <text x="64" y="210" fill="#c9d1d9" font-size="24">AI agents drive the MT5 Strategy Tester — safely.</text>
+    <g font-size="17" font-weight="600">
+      <rect x="64" y="240" width="168" height="36" rx="18" fill="#1f6feb" fill-opacity="0.18" stroke="#1f6feb"/>
+      <text x="148" y="264" fill="#79c0ff" text-anchor="middle">Backtest-only</text>
+      <rect x="244" y="240" width="200" height="36" rx="18" fill="#3fb950" fill-opacity="0.15" stroke="#3fb950"/>
+      <text x="344" y="264" fill="#7ee787" text-anchor="middle">Zero dependencies</text>
+      <rect x="456" y="240" width="190" height="36" rx="18" fill="#d29922" fill-opacity="0.15" stroke="#d29922"/>
+      <text x="551" y="264" fill="#e3b341" text-anchor="middle">Real MT5 numbers</text>
+    </g>
+  </g>
+</svg>

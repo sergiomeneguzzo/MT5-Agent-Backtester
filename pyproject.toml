@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mt5-agent-backtester"
+version = "0.1.0"
+description = "Let AI agents run MetaTrader 5 backtests, optimizations and walk-forward analysis through MT5's built-in MCP server — backtest-only, no trading tools."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Sergio Meneguzzo" }]
+keywords = ["metatrader5", "mt5", "mql5", "backtesting", "strategy-tester", "mcp",
+            "ai-agents", "claude", "algorithmic-trading", "walk-forward", "expert-advisor"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = []  # core is standard-library only
+
+[project.optional-dependencies]
+plot = ["matplotlib>=3.7", "pandas>=2.0"]
+dev = ["pytest>=8", "ruff>=0.5", "matplotlib>=3.7", "pandas>=2.0"]
+
+[project.scripts]
+mt5agent = "mt5agent.cli:main"
+mt5agent-mcp = "mt5agent.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/sergiomeneguzzo/mt5-agent-backtester"
+Issues = "https://github.com/sergiomeneguzzo/mt5-agent-backtester/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mt5agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E731", "B905"]
+per-file-ignores = { "tests/*" = ["E501"] }
