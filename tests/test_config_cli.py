@@ -53,7 +53,7 @@ def test_offline_report_command(tmp_path, sample_xlsx, optimization_xml, capsys)
 
 def test_custom_tool_can_be_registered(client):
     @tool("count_experts", "How many experts are compiled.", schema())
-    def count_experts(tester, args):
+    def count_experts(ctx, args):
         return {"count": 1}
 
     try:
@@ -65,8 +65,9 @@ def test_custom_tool_can_be_registered(client):
         stdout = io.StringIO()
         Server(lambda: None).serve(stdin, stdout)
         replies = [json.loads(line) for line in stdout.getvalue().splitlines()]
-        assert "count_experts" in [t["name"] for t in replies[0]["result"]["tools"]]
-        assert json.loads(replies[1]["result"]["content"][0]["text"]) == {"count": 1}
-        assert [r["error"]["code"] for r in replies[2:]] == [-32600, -32700]
+        by_id = {r["id"]: r for r in replies if r["id"] is not None}
+        assert "count_experts" in [t["name"] for t in by_id[1]["result"]["tools"]]
+        assert json.loads(by_id[2]["result"]["content"][0]["text"]) == {"count": 1}
+        assert sorted(r["error"]["code"] for r in replies if r["id"] is None) == [-32700, -32600]
     finally:
         TOOLS.pop("count_experts")

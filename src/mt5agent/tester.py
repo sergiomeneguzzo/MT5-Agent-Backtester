@@ -123,7 +123,9 @@ class Tester:
             raw = self._download_report(run_id, "xml", temp)
         config["inputs"] = {k: (vars(v) if isinstance(v, Range) else v) for k, v in inputs.items()}
         config["grid_size"] = combinations
-        return OptimizationRun(run_id, config, parse_optimization_xml(raw), time.monotonic() - started, raw)
+        params = [name for name, value in inputs.items() if isinstance(value, Range)]
+        result = parse_optimization_xml(raw, params=params)
+        return OptimizationRun(run_id, config, result, time.monotonic() - started, raw)
 
     def walk_forward(self, expert: str, symbol: str, timeframe: str, start: DateLike, end: DateLike, *,
                      inputs: Mapping[str, Any], is_months: int = 24, oos_months: int = 6,

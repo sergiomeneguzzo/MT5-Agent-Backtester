@@ -9,7 +9,9 @@ from ._xlsx import Row, read_rows
 
 TIME_FORMAT = "%Y.%m.%d %H:%M:%S"
 SECTIONS = ("Settings", "Results", "Orders", "Deals")
+SETTINGS_ORDER = ("expert", "symbol", "period", "inputs", "company", "currency", "initial deposit", "leverage")
 PRIVATE_FIELDS = ("server", "company", "account", "login", "name")
+ENTRY, EXIT = "in", "out"
 DEAL_COLUMNS = ("time", "deal", "symbol", "type", "direction", "volume", "price", "order",
                 "commission", "swap", "profit", "balance", "comment")
 
@@ -33,6 +35,16 @@ class Deal:
     @property
     def net(self) -> float:
         return self.profit + self.commission + self.swap
+
+    @property
+    def is_trade(self) -> bool:
+        return bool(self.symbol)
+
+    @property
+    def is_exit(self) -> bool:
+        if self.direction in (ENTRY, EXIT, "inout"):
+            return self.direction != ENTRY
+        return self.profit != 0 or self.swap != 0
 
 
 @dataclass
@@ -58,26 +70,26 @@ class BacktestReport:
 
     @property
     def initial_deposit(self) -> float:
-        first_balance = next((d.balance for d in self.deals if d.type == "balance"), None)
+        first_balance = next((d.balance for d in self.deals if not d.is_trade), None)
         return first_balance if first_balance is not None else (to_number(self.settings.get("initial deposit")) or 0.0)
 
     @property
     def trades(self) -> list[Trade]:
         trades, entry_costs = [], 0.0
         for deal in self.deals:
-            if deal.type not in ("buy", "sell"):
+            if not deal.is_trade:
                 continue
-            if deal.direction == "in":
+            if not deal.is_exit:
                 entry_costs += deal.commission + deal.swap
                 continue
-            side = "long" if deal.type == "sell" else "short"
+            side = {"sell": "long", "buy": "short"}.get(deal.type, "unknown")
             trades.append(Trade(deal.time, deal.symbol, side, deal.volume, deal.price,
                                 deal.net + entry_costs, deal.balance))
             entry_costs = 0.0
         return trades
 
     def equity_curve(self) -> list[tuple[datetime, float]]:
-        return [(d.time, d.balance) for d in self.deals if d.direction != "in" or d.type == "balance"]
+        return [(d.time, d.balance) for d in self.deals if not d.is_trade or d.is_exit]
 
     def metric(self, label: str) -> float | None:
         return to_number(self.results.get(label.lower().rstrip(":")))
@@ -96,32 +108,36 @@ class BacktestReport:
 
 def parse_backtest_xlsx(data: bytes, *, keep_private: bool = False) -> BacktestReport:
     report = BacktestReport()
-    section, deals_header_seen, last_label = "", False, ""
+    headings, section, label_index, last_label = 0, "", 0, ""
 
     for row in read_rows(data):
         filled = [c for c in row if c not in (None, "")]
         if not filled:
             continue
-        if len(filled) == 1 and row[0] in SECTIONS:
-            section, deals_header_seen = row[0], False
+        if len(filled) == 1 and row[0]:
+            headings += 1
+            if headings == 2:
+                report.settings["server"] = row[0]
+            section = row[0] if row[0] in SECTIONS else _section_by_position(headings, section)
             continue
 
-        if section in ("Settings", "Results"):
-            target = report.settings if section == "Settings" else report.results
+        if section == "Settings":
             for label, value in _label_pairs(row, continues_inputs=last_label == "inputs"):
+                if label != "inputs" or last_label != "inputs":
+                    label = _canonical_setting(label, label_index)
+                    label_index += 1
                 last_label = label
-                if label == "inputs" and "=" in value:
-                    name, val = value.split("=", 1)
-                    report.inputs[name] = val
+                if label == "inputs":
+                    if "=" in value:
+                        name, val = value.split("=", 1)
+                        report.inputs[name] = val
                 else:
-                    target[label] = value
-        elif section == "Deals":
-            if not deals_header_seen:
-                deals_header_seen = True
-            elif _parse_time(row[0]):
-                report.deals.append(_deal(row))
-        elif not section and row[0] != "Strategy Tester Report":
-            report.settings.setdefault("server", row[0])
+                    report.settings[label] = value
+        elif section == "Results":
+            for label, value in _label_pairs(row, continues_inputs=False):
+                report.results[label] = value
+        elif section == "Deals" and _is_deal_row(row):
+            report.deals.append(_deal(row))
 
     report.expert = report.settings.get("expert", "")
     report.symbol = report.settings.get("symbol", "")
@@ -130,6 +146,24 @@ def parse_backtest_xlsx(data: bytes, *, keep_private: bool = False) -> BacktestR
         for key in PRIVATE_FIELDS:
             report.settings.pop(key, None)
     return report
+
+
+def _section_by_position(headings: int, current: str) -> str:
+    by_position = {3: "Settings", 4: "Results", 5: "Orders", 6: "Deals"}
+    return by_position.get(headings, current)
+
+
+def _canonical_setting(label: str, index: int) -> str:
+    if label in SETTINGS_ORDER:
+        return label
+    return SETTINGS_ORDER[index] if index < len(SETTINGS_ORDER) else label
+
+
+def _is_deal_row(row: Row) -> bool:
+    values = dict(zip(DEAL_COLUMNS, row))
+    return (_parse_time(values.get("time")) is not None
+            and to_number(values.get("deal")) is not None
+            and to_number(values.get("balance")) is not None)
 
 
 def to_number(value: str | None) -> float | None:

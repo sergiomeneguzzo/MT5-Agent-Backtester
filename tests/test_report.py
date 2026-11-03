@@ -77,3 +77,53 @@ def test_metrics_edge_cases():
     assert profit_factor([]) == 0.0
     assert profit_factor([5, 5]) == float("inf")
     assert max_drawdown([100, 120, 90, 130]) == (30, 25.0)
+
+
+ITALIAN = {
+    "Strategy Tester Report": "Rapporto del Tester di Strategia", "Settings": "Impostazioni",
+    "Results": "Risultati", "Orders": "Ordini", "Deals": "Operazioni", "Expert:": "Esperto:",
+    "Symbol:": "Simbolo:", "Period:": "Periodo:", "Inputs:": "Parametri di input:", "Company:": "Società:",
+    "Initial Deposit:": "Deposito iniziale:", "Total Net Profit:": "Profitto netto totale:",
+    "Profit Factor:": "Fattore di profitto:", "Time": "Tempo", "Deal": "Operazione",
+}
+
+
+def test_localized_report_gives_the_same_result():
+    from conftest import SAMPLE_ROWS, build_xlsx
+
+    english = parse_backtest_xlsx(build_xlsx(SAMPLE_ROWS))
+    italian = parse_backtest_xlsx(build_xlsx([[ITALIAN.get(c, c) for c in row] for row in SAMPLE_ROWS]))
+    assert (italian.expert, italian.symbol, italian.period) == (english.expert, english.symbol, english.period)
+    assert italian.inputs == english.inputs
+    assert italian.deals == english.deals
+    assert italian.summary() == english.summary()
+    assert "company" not in italian.settings and "server" not in italian.settings
+
+
+def test_orders_are_not_mistaken_for_deals(sample_xlsx):
+    assert [d.deal for d in parse_backtest_xlsx(sample_xlsx).deals] == [1, 2, 3, 4, 5]
+
+
+ITALIAN_METRICS = ["Passaggio", "Risultato", "Profitto", "Payoff atteso", "Fattore di profitto",
+                   "Fattore di recupero", "Indice di Sharpe", "Personalizzato", "DD equity %", "Operazioni"]
+
+
+def _localized_xml(optimization_xml: bytes) -> bytes:
+    text = optimization_xml.decode()
+    english = ["Pass", "Result", "Profit", "Expected Payoff", "Profit Factor", "Recovery Factor",
+               "Sharpe Ratio", "Custom", "Equity DD %", "Trades"]
+    for en, it in zip(english, ITALIAN_METRICS):
+        text = text.replace(f'<Data ss:Type="String">{en}</Data>', f'<Data ss:Type="String">{it}</Data>', 1)
+    return text.encode()
+
+
+def test_localized_optimization_with_known_params(optimization_xml):
+    res = parse_optimization_xml(_localized_xml(optimization_xml), params=["MovingPeriod", "MovingShift"])
+    assert res.params == ["MovingPeriod", "MovingShift"]
+    assert res.best("Profit Factor")["MovingPeriod"] == 80
+
+
+def test_localized_optimization_offline(optimization_xml):
+    res = parse_optimization_xml(_localized_xml(optimization_xml))
+    assert res.params == ["MovingPeriod", "MovingShift"]
+    assert res.best("Profit Factor", min_trades=900)["Trades"] >= 900

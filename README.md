@@ -168,6 +168,16 @@ The agent gets these tools:
 | `run_backtest` | one backtest: profit, profit factor, drawdown, trades, yearly returns |
 | `run_optimization` | grid of inputs: number of profitable passes and the best ones |
 | `run_walk_forward` | walk-forward: parameters per window and the out-of-sample result |
+| `get_job`, `list_jobs`, `cancel_job` | follow or cancel runs started in the background |
+
+**Long runs.** An optimization or a walk-forward can take minutes. Two ways to handle it:
+
+- **Just call the tool.** The server keeps answering and sends progress updates (for example *fold 2/4 done*)
+  to clients that support them, so the call doesn't look stuck.
+- **Pass `"background": true`.** The tool returns a `job_id` right away. The agent can do other work and check
+  in with `get_job`, which shows the status, the progress and, at the end, the result.
+
+Runs are queued and executed one at a time, the same way the Strategy Tester works.
 
 [`examples/claude_code/CLAUDE.md`](examples/claude_code/CLAUDE.md) is a ready-made set of instructions you
 can drop into your project so the agent follows good testing habits.
@@ -260,7 +270,8 @@ client = MT5Client(Settings(url="http://127.0.0.1:22346/mcp", key="..."))
 | `401 Unauthorized` | the key is wrong, or you generated a new one and haven't restarted MetaTrader 5 |
 | an error about the `.ex5` path | the EA path is wrong: run `mt5agent experts` to see the exact names |
 | a test takes longer than expected | real-tick tests on many years are slow, so try `--model "open prices"` first |
-| the agent gives up on a long optimization | raise the MCP tool timeout of your client, or shorten the period / grid |
+| the agent gives up on a long optimization | ask it to use `"background": true` and poll `get_job`, or raise the MCP tool timeout of your client |
+| MetaTrader 5 is not in English | nothing to do: reports are read by their layout, not by their labels, so any terminal language works |
 
 ---
 
@@ -294,7 +305,7 @@ src/mt5agent/
 ├── metrics.py       profit factor, drawdown, yearly returns
 ├── reports/         readers for the .xlsx and .xml reports
 ├── cli/             the mt5agent command
-├── mcp/             the mt5agent-mcp server for agents
+├── mcp/             the mt5agent-mcp server for agents, with its job queue
 └── plots.py         charts
 ```
 
@@ -303,15 +314,19 @@ src/mt5agent/
 ## Extending
 
 Commands and agent tools are plain functions with a decorator, so you add one without touching anything else.
+With `long_running=True` a tool automatically gets the `background` option and runs in the job queue.
 
 New agent tool, in [`src/mt5agent/mcp/tools.py`](src/mt5agent/mcp/tools.py):
 
 ```python
-@tool("compare_models", "Run the same backtest with open prices and real ticks.", run_schema())
-def compare_models(tester: Tester, args: dict) -> dict:
+@tool("compare_models", "Run the same backtest with open prices and real ticks.", run_schema(), long_running=True)
+def compare_models(ctx: ToolContext, args: dict) -> dict:
     positional, options = run_args(args)
-    runs = {m: tester.backtest(*positional, **{**options, "model": m}) for m in ("open prices", "real ticks")}
-    return {m: run.summary() for m, run in runs.items()}
+    results = {}
+    for model in ("open prices", "real ticks"):
+        ctx.progress(f"{model} running")
+        results[model] = ctx.tester.backtest(*positional, **{**options, "model": model}).summary()
+    return results
 ```
 
 New command, in [`src/mt5agent/cli/commands.py`](src/mt5agent/cli/commands.py):

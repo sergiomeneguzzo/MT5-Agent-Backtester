@@ -5,10 +5,9 @@ from dataclasses import dataclass
 
 SS = "{urn:schemas-microsoft-com:office:spreadsheet}"
 OFFICE = "{urn:schemas-microsoft-com:office:office}"
-METRIC_COLUMNS = frozenset({
-    "Pass", "Result", "Profit", "Expected Payoff", "Profit Factor", "Recovery Factor",
-    "Sharpe Ratio", "Custom", "Equity DD %", "Trades", "Forward Result", "Back Result",
-})
+STANDARD_METRICS = ("Pass", "Result", "Profit", "Expected Payoff", "Profit Factor", "Recovery Factor",
+                    "Sharpe Ratio", "Custom", "Equity DD %", "Trades")
+METRIC_COLUMNS = frozenset({*STANDARD_METRICS, "Forward Result", "Back Result"})
 
 
 @dataclass
@@ -37,17 +36,32 @@ class OptimizationResult:
         return pd.DataFrame(self.passes)
 
 
-def parse_optimization_xml(data: bytes | str) -> OptimizationResult:
+def parse_optimization_xml(data: bytes | str, params: list[str] | None = None) -> OptimizationResult:
     root = ET.fromstring(data.encode() if isinstance(data, str) else data)
     rows = [_cells(row) for row in root.iter(f"{SS}Row")]
     if not rows:
         return OptimizationResult("", [], [], [])
 
-    columns = [str(c) for c in rows[0]]
+    columns = _english_columns([str(c) for c in rows[0]], params)
     params = [c for c in columns if c not in METRIC_COLUMNS]
     passes = [_normalize(dict(zip(columns, row)), ("Pass", "Trades", *params)) for row in rows[1:]]
     title = root.find(f".//{OFFICE}Title")
     return OptimizationResult(title.text if title is not None else "", columns, passes, params)
+
+
+def _english_columns(columns: list[str], params: list[str] | None) -> list[str]:
+    if any(c in METRIC_COLUMNS for c in columns):
+        return columns
+    if params:
+        metrics = [i for i, c in enumerate(columns) if c not in params]
+    else:
+        metrics = list(range(min(len(STANDARD_METRICS), len(columns))))
+    if len(metrics) != len(STANDARD_METRICS):
+        return columns
+    renamed = list(columns)
+    for i, name in zip(metrics, STANDARD_METRICS):
+        renamed[i] = name
+    return renamed
 
 
 def _cells(row: ET.Element) -> list:
