@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="mt5-agent-backtester — AI agents drive the MT5 Strategy Tester, safely" width="100%">
+  <img src="docs/images/banner.svg" alt="mt5-agent-backtester" width="100%">
 </p>
 
 <p align="center">
@@ -83,15 +83,22 @@ folds were profitable and the **walk-forward efficiency** (OOS profit per month 
 
 ```
 src/mt5agent/
-├── client.py       MT5Client: JSON-RPC over streamable HTTP, session handling, trade_* guard
-├── tester.py       Tester: backtest() · optimize() · walk_forward() · chart/temp-file hygiene
-├── report.py       .xlsx backtest report → deals/trades; SpreadsheetML optimization → passes
-├── walkforward.py  rolling / anchored folds, stitched OOS result, walk-forward efficiency
-├── metrics.py      profit factor, drawdown, yearly returns (stdlib)
-├── inputs.py       Range() + native .set lines (name=value||start||step||stop||Y)
-├── mcp_server.py   stdio MCP server for agents (5 tools, no trading)
-├── cli.py          `mt5agent` command, --json everywhere
-└── plots.py        optional matplotlib charts (equity, heatmap, walk-forward)
+├── config.py          connection settings and defaults, the only file you need to touch
+├── client.py          MT5Client: JSON-RPC over HTTP, session handling, trade_* guard
+├── tester.py          Tester: backtest(), optimize(), walk_forward(), cleanup
+├── walkforward.py     fold generation, stitched out-of-sample result, efficiency
+├── inputs.py          Range() and native .set lines
+├── metrics.py         profit factor, drawdown, yearly returns
+├── reports/
+│   ├── backtest.py    .xlsx report -> deals, trades, equity curve
+│   └── optimization.py  SpreadsheetML -> passes with their inputs
+├── cli/
+│   ├── commands.py    one function per `mt5agent` command
+│   └── output.py      tables, colors, --json
+├── mcp/
+│   ├── tools.py       one function per agent tool
+│   └── server.py      stdio JSON-RPC loop
+└── plots.py           optional matplotlib charts
 ```
 
 The core needs **no third-party packages**: `urllib`, `zipfile` and `xml.etree` only. `matplotlib`/`pandas`
@@ -109,7 +116,7 @@ are an optional extra, needed for charts and DataFrames.
 3. **Restart MetaTrader 5**. A newly generated key is only accepted after a restart (until then you get `401`).
 4. Keep the terminal open while you work: the server lives inside it and listens on `127.0.0.1:22346` only.
 
-> 💡 For extra peace of mind, run backtests on a terminal that is logged into a **demo** account.
+> For extra peace of mind, run backtests on a terminal logged into a **demo** account.
 
 ### 2. Install
 
@@ -126,8 +133,7 @@ pip install -e ".[plot]"
 cp .env.example .env      # then paste your key into MT5_MCP_KEY
 ```
 
-Settings are read from environment variables first, then from the nearest `.env` (searching upward from the
-current directory). Keys are never printed: `Settings.__repr__` masks them.
+See [Configuration](#configuration) for every option.
 
 ### 4. Check the connection
 
@@ -145,6 +151,33 @@ can_run_backtest      True
 can_run_optimization  True
 trading_tools         blocked
 ```
+
+---
+
+## Configuration
+
+Everything that depends on your machine lives in [`src/mt5agent/config.py`](src/mt5agent/config.py) and can be
+overridden from the environment or a `.env` file (environment wins, `.env` is searched upward from the
+current directory).
+
+| Variable | Default | Used for |
+|---|---|---|
+| `MT5_MCP_URL` | `http://127.0.0.1:22346/mcp` | terminal MCP server |
+| `MT5_MCP_KEY` | *(required)* | key generated in Tools > Options > MCP |
+| `MT5_MCP_TIMEOUT` | `3600` | HTTP timeout in seconds (long optimizations) |
+| `METAEDITOR_MCP_URL` / `METAEDITOR_MCP_KEY` | `http://127.0.0.1:22345/mcp` | MetaEditor server, optional |
+
+Tester defaults (`DEFAULT_MODEL`, `DEFAULT_DEPOSIT`, `DEFAULT_LEVERAGE`, `FILE_PREFIX`) sit at the top of the same
+file and are shared by the Python API, the CLI and the MCP server. In code you can skip the environment
+entirely:
+
+```python
+from mt5agent import MT5Client, Settings
+
+client = MT5Client(Settings(url="http://127.0.0.1:22346/mcp", key="..."))
+```
+
+The key is excluded from `repr()`, so it never ends up in logs or tracebacks.
 
 ---
 
@@ -244,6 +277,32 @@ config.
 
 ---
 
+## Extending
+
+Agent tools and CLI commands are plain functions registered with a decorator, so adding one does not touch
+the protocol or argument-parsing code.
+
+A new MCP tool, in [`mcp/tools.py`](src/mt5agent/mcp/tools.py):
+
+```python
+@tool("compare_models", "Run the same backtest with open prices and real ticks.", run_schema())
+def compare_models(tester: Tester, args: dict) -> dict:
+    positional, options = run_args(args)
+    runs = {m: tester.backtest(*positional, **{**options, "model": m}) for m in ("open prices", "real ticks")}
+    return {m: run.summary() for m, run in runs.items()}
+```
+
+A new CLI command, in [`cli/commands.py`](src/mt5agent/cli/commands.py):
+
+```python
+@command("charts", "list open charts")
+def charts(ctx: Context) -> None:
+    items = ctx.client.call("list_open_charts").get("charts", [])
+    ctx.out.json(items) if ctx.out.as_json else ctx.out.table(("id", "symbol"), [(c["chart_id"], c["symbol"]) for c in items])
+```
+
+---
+
 ## Safety model
 
 - **No trading, by construction.** `MT5Client.call()` raises `TradingBlockedError` for any `trade_*` tool
@@ -281,7 +340,7 @@ Things you would otherwise discover the hard way. The library handles all of the
 
 ```bash
 pip install -e ".[dev]"
-pytest -q          # 32 tests, no terminal needed: a fake MCP transport replays real MT5 output
+pytest -q          # 38 tests, no terminal needed: a fake MCP transport replays real MT5 output
 ruff check src tests
 ```
 

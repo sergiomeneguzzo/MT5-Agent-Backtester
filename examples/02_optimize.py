@@ -8,18 +8,18 @@ opt = tester.optimize(
     symbol="EURUSD", timeframe="H1",
     start="2020-01-01", end="2025-12-31",
     inputs={
-        "MaximumRisk": 0.02,                       # fixed
-        "MovingPeriod": Range(10, 100, 10),        # optimized
-        "MovingShift": Range(0, 10, 2),            # optimized
+        "MaximumRisk": 0.02,
+        "MovingPeriod": Range(10, 100, 10),
+        "MovingShift": Range(0, 10, 2),
     },
     criterion="profit_factor",
 )
 
 res = opt.result
 print(f"{opt.passes} passes in {opt.seconds:.0f}s, optimized: {res.params}")
-print("best (in-sample!):", res.best(by="Profit Factor", min_trades=200))
+print("best in-sample pass:", res.best(by="Profit Factor", min_trades=200))
 
-df = res.to_dataframe()                            # needs pandas
+df = res.to_dataframe()
 print(df.sort_values("Profit Factor", ascending=False).head(10))
 
 from mt5agent.plots import plot_heatmap  # noqa: E402

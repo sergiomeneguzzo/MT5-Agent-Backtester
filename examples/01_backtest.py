@@ -1,6 +1,5 @@
 """Run one backtest of the Moving Average EA that ships with every MT5 install."""
 from mt5agent import MT5Client, Tester
-from mt5agent.metrics import yearly_returns
 
 tester = Tester(MT5Client.connect())
 
@@ -12,13 +11,12 @@ run = tester.backtest(
     inputs={"MovingPeriod": 12, "MovingShift": 6},
 )
 
-print(run.summary())                       # metrics straight from MT5
-rep = run.report                           # every deal, parsed from the .xlsx report
+print(run.summary())
+rep = run.report
 print(len(rep.trades), "closed trades, first:", rep.trades[0])
-for year, ret in yearly_returns(rep.trades, rep.initial_deposit).items():
+for year, ret in rep.yearly_returns().items():
     print(year, f"{ret:+.2f}%")
 
-# Optional: pip install "mt5-agent-backtester[plot]"
 from mt5agent.plots import plot_equity  # noqa: E402
 
 plot_equity(rep, "equity.png")

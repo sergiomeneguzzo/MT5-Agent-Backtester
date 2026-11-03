@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from mt5agent.metrics import max_drawdown, profit_factor, yearly_returns
-from mt5agent.report import parse_backtest_xlsx, parse_optimization_xml
+from mt5agent.reports import parse_backtest_xlsx, parse_optimization_xml
 
 
 def test_backtest_header_and_inputs(sample_xlsx):

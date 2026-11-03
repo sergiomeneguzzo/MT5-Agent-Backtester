@@ -27,7 +27,7 @@ dev = ["pytest>=8", "ruff>=0.5", "matplotlib>=3.7", "pandas>=2.0"]
 
 [project.scripts]
 mt5agent = "mt5agent.cli:main"
-mt5agent-mcp = "mt5agent.mcp_server:main"
+mt5agent-mcp = "mt5agent.mcp:main"
 
 [project.urls]
 Homepage = "https://github.com/sergiomeneguzzo/mt5-agent-backtester"

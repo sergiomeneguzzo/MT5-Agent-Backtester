@@ -1,19 +1,12 @@
-"""Expert Advisor inputs -> native MT5 ``.set`` lines.
-
-    {"MovingPeriod": 12}                       -> "MovingPeriod=12"
-    {"MovingPeriod": Range(10, 100, 10)}       -> "MovingPeriod=10||10||10||100||Y"
-    {"UseFilter": True}                        -> "UseFilter=true"
-"""
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 
 @dataclass(frozen=True)
 class Range:
-    """An input to optimize: ``start``..``stop`` (inclusive) every ``step``."""
     start: float
     stop: float
     step: float
@@ -25,14 +18,56 @@ class Range:
             raise ValueError("stop must be >= start")
 
     def values(self) -> list[float]:
-        out, v = [], self.start
-        while v <= self.stop + 1e-12:
-            out.append(round(v, 10))
-            v += self.step
-        return out
+        values, current = [], self.start
+        while current <= self.stop + 1e-12:
+            values.append(round(current, 10))
+            current += self.step
+        return values
+
+    @classmethod
+    def parse(cls, value: Any) -> Range | Any:
+        if isinstance(value, (list, tuple)) and len(value) == 3:
+            return cls(*value)
+        if isinstance(value, Mapping) and {"start", "stop", "step"} <= value.keys():
+            return cls(value["start"], value["stop"], value["step"])
+        return value
 
 
-def fmt(value: Any) -> str:
+def to_set_lines(inputs: Mapping[str, Any] | None) -> list[str]:
+    lines = []
+    for name, value in (inputs or {}).items():
+        if isinstance(value, Range):
+            start, step, stop = (_format(v) for v in (value.start, value.step, value.stop))
+            lines.append(f"{name}={start}||{start}||{step}||{stop}||Y")
+        else:
+            lines.append(f"{name}={_format(value)}")
+    return lines
+
+
+def grid_size(inputs: Mapping[str, Any] | None) -> int:
+    size = 1
+    for value in (inputs or {}).values():
+        if isinstance(value, Range):
+            size *= len(value.values())
+    return size
+
+
+def parse_inputs(raw: Mapping[str, Any] | None) -> dict[str, Any]:
+    return {name: Range.parse(value) for name, value in (raw or {}).items()}
+
+
+def parse_assignments(items: Iterable[str]) -> dict[str, Any]:
+    inputs: dict[str, Any] = {}
+    for item in items:
+        name, sep, value = item.partition("=")
+        if not sep:
+            raise ValueError(f"bad parameter {item!r}: expected Name=value or Name=start:stop:step")
+        parts = value.split(":")
+        inputs[name] = Range(*map(float, parts)) if len(parts) == 3 else _literal(value)
+    return inputs
+
+
+def _format(value: Any) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, float) and value.is_integer():
@@ -40,20 +75,12 @@ def fmt(value: Any) -> str:
     return str(value)
 
 
-def to_set_lines(inputs: Mapping[str, Any] | None) -> list[str]:
-    lines = []
-    for name, value in (inputs or {}).items():
-        if isinstance(value, Range):
-            lines.append(f"{name}={fmt(value.start)}||{fmt(value.start)}||{fmt(value.step)}"
-                         f"||{fmt(value.stop)}||Y")
-        else:
-            lines.append(f"{name}={fmt(value)}")
-    return lines
-
-
-def grid_size(inputs: Mapping[str, Any] | None) -> int:
-    n = 1
-    for value in (inputs or {}).values():
-        if isinstance(value, Range):
-            n *= len(value.values())
-    return n
+def _literal(text: str) -> Any:
+    if text.lower() in ("true", "false"):
+        return text.lower() == "true"
+    for cast in (int, float):
+        try:
+            return cast(text)
+        except ValueError:
+            pass
+    return text

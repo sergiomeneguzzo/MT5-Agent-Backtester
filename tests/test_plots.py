@@ -5,7 +5,7 @@ import pytest
 pytest.importorskip("matplotlib")
 
 from mt5agent.plots import plot_equity, plot_heatmap, plot_walk_forward  # noqa: E402
-from mt5agent.report import Trade, parse_backtest_xlsx, parse_optimization_xml  # noqa: E402
+from mt5agent.reports import Trade, parse_backtest_xlsx, parse_optimization_xml  # noqa: E402
 from mt5agent.walkforward import FoldResult, WalkForwardResult, make_folds  # noqa: E402
 
 

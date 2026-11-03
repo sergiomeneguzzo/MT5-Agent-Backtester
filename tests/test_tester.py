@@ -3,8 +3,7 @@ from datetime import date
 import pytest
 
 from mt5agent import Range, Tester, TradingBlockedError
-from mt5agent.cli import parse_params
-from mt5agent.inputs import grid_size, to_set_lines
+from mt5agent.inputs import grid_size, parse_assignments, to_set_lines
 from mt5agent.walkforward import make_folds
 
 
@@ -32,7 +31,7 @@ def test_set_lines():
 
 
 def test_cli_param_parsing():
-    p = parse_params(["A=1:5:2", "B=0.25", "C=false", "D=text"])
+    p = parse_assignments(["A=1:5:2", "B=0.25", "C=false", "D=text"])
     assert p["A"] == Range(1, 5, 2) and p["B"] == 0.25 and p["C"] is False and p["D"] == "text"
 
 

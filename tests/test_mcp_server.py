@@ -1,7 +1,8 @@
 import json
 
 from mt5agent import Tester
-from mt5agent.mcp_server import Server, _parse_inputs
+from mt5agent.inputs import parse_inputs
+from mt5agent.mcp import Server
 
 
 def _server(client):
@@ -48,5 +49,5 @@ def test_unknown_method(client):
 
 
 def test_parse_inputs_shapes():
-    p = _parse_inputs({"A": [1, 5, 1], "B": {"start": 0, "stop": 1, "step": 0.5}, "C": 3})
+    p = parse_inputs({"A": [1, 5, 1], "B": {"start": 0, "stop": 1, "step": 0.5}, "C": 3})
     assert p["A"].stop == 5 and p["B"].step == 0.5 and p["C"] == 3

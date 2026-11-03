@@ -17,9 +17,8 @@ from rich.json import JSON
 from rich.table import Table
 from rich.text import Text
 
-from mt5agent.metrics import yearly_returns
 from mt5agent.plots import plot_equity, plot_heatmap, plot_walk_forward
-from mt5agent.report import Trade, parse_backtest_xlsx, parse_optimization_xml
+from mt5agent.reports import Trade, parse_backtest_xlsx, parse_optimization_xml
 from mt5agent.walkforward import Fold, FoldResult, WalkForwardResult
 
 OUT = Path(__file__).parent / "images"
@@ -141,7 +140,7 @@ def main() -> None:
     rep = parse_backtest_xlsx(Path(a.xlsx).read_bytes())
     stats = json.loads(Path(a.stats).read_text())
     opt = parse_optimization_xml(Path(a.opt).read_bytes())
-    yearly = yearly_returns(rep.trades, rep.initial_deposit)
+    yearly = rep.yearly_returns()
 
     plot_equity(rep, str(OUT / "equity.png"),
                 title="Moving Average (MetaQuotes example) · EURUSD H1 · 2020–2025 · open prices")

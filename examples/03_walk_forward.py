@@ -13,7 +13,7 @@ wf = tester.walk_forward(
     on_fold=lambda f: print(f.fold.label(), f.best_params, f.oos_summary["profit_factor"]),
 )
 
-print(wf.summary())   # stitched out-of-sample result + walk-forward efficiency
+print(wf.summary())
 
 from mt5agent.plots import plot_walk_forward  # noqa: E402
 

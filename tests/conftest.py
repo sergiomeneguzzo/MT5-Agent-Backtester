@@ -1,4 +1,3 @@
-"""Shared fixtures: an MT5-style .xlsx builder and a fake MCP transport."""
 from __future__ import annotations
 
 import io
@@ -25,7 +24,6 @@ def _col(i: int) -> str:
 
 
 def build_xlsx(rows: list[list[str | None]]) -> bytes:
-    """Write rows like MT5 does: shared strings, parts encoded as UTF-16."""
     strings: list[str] = []
     index: dict[str, int] = {}
     xml_rows = []
@@ -93,8 +91,6 @@ def optimization_xml() -> bytes:
 
 
 class FakeMT5:
-    """In-memory stand-in for the MetaTrader 5 MCP server."""
-
     def __init__(self, files: dict[str, bytes] | None = None, charts=None) -> None:
         self.calls: list[tuple[str, dict]] = []
         self.files = dict(files or {})

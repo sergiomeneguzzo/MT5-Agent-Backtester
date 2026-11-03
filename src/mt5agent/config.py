@@ -1,68 +1,59 @@
-"""Connection settings: environment variables first, then a local ``.env`` file.
-
-Nothing here is ever printed or logged. Keys only work on 127.0.0.1 anyway,
-but treat them like passwords.
-"""
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_TERMINAL_URL = "http://127.0.0.1:22346/mcp"
-DEFAULT_EDITOR_URL = "http://127.0.0.1:22345/mcp"
+TERMINAL_URL = "http://127.0.0.1:22346/mcp"
+EDITOR_URL = "http://127.0.0.1:22345/mcp"
+REQUEST_TIMEOUT = 3600
 
+ENV_TERMINAL_URL = "MT5_MCP_URL"
+ENV_TERMINAL_KEY = "MT5_MCP_KEY"
+ENV_EDITOR_URL = "METAEDITOR_MCP_URL"
+ENV_EDITOR_KEY = "METAEDITOR_MCP_KEY"
+ENV_TIMEOUT = "MT5_MCP_TIMEOUT"
 
-def _read_dotenv(path: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not path.is_file():
-        return values
-    for raw in path.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key.strip()] = value.strip().strip('"').strip("'")
-    return values
-
-
-def _find_dotenv(start: Path) -> Path | None:
-    for folder in (start, *start.parents):
-        candidate = folder / ".env"
-        if candidate.is_file():
-            return candidate
-    return None
+DEFAULT_MODEL = "open prices"
+DEFAULT_DEPOSIT = 10_000.0
+DEFAULT_LEVERAGE = 100
+FILE_PREFIX = "mt5agent"
 
 
 @dataclass(frozen=True)
 class Settings:
-    url: str
-    key: str
+    url: str = TERMINAL_URL
+    key: str = field(default="", repr=False)
+    timeout: float = REQUEST_TIMEOUT
 
     @classmethod
-    def load(cls, editor: bool = False, dotenv: str | os.PathLike | None = None) -> Settings:
-        """Resolve URL + key for the terminal (default) or the MetaEditor server.
-
-        Lookup order: ``MT5_MCP_URL`` / ``MT5_MCP_KEY`` (or ``METAEDITOR_MCP_*``)
-        in the environment, then in ``dotenv`` or the first ``.env`` found walking
-        up from the current directory.
-        """
-        prefix = "METAEDITOR" if editor else "MT5"
-        path = Path(dotenv) if dotenv else _find_dotenv(Path.cwd())
-        file_values = _read_dotenv(path) if path else {}
-
-        def get(name: str) -> str | None:
-            return os.environ.get(name) or file_values.get(name)
-
-        url = get(f"{prefix}_MCP_URL") or (DEFAULT_EDITOR_URL if editor else DEFAULT_TERMINAL_URL)
-        key = get(f"{prefix}_MCP_KEY")
+    def from_env(cls, editor: bool = False, dotenv: str | os.PathLike | None = None) -> Settings:
+        env = {**_read_dotenv(Path(dotenv) if dotenv else _find_dotenv(Path.cwd())), **os.environ}
+        url_var, key_var = (ENV_EDITOR_URL, ENV_EDITOR_KEY) if editor else (ENV_TERMINAL_URL, ENV_TERMINAL_KEY)
+        key = env.get(key_var, "")
         if not key:
             raise RuntimeError(
-                f"{prefix}_MCP_KEY is not set. Generate a key in MetaTrader 5 "
-                "(Tools > Options > MCP), restart the terminal and put it in .env "
-                "(see .env.example)."
+                f"{key_var} is not set. Generate a key in MetaTrader 5 (Tools > Options > MCP), "
+                "restart the terminal and add it to .env (see .env.example)."
             )
-        return cls(url=url, key=key)
+        return cls(
+            url=env.get(url_var) or (EDITOR_URL if editor else TERMINAL_URL),
+            key=key,
+            timeout=float(env.get(ENV_TIMEOUT) or REQUEST_TIMEOUT),
+        )
 
-    def __repr__(self) -> str:  # never leak the key in tracebacks / logs
-        return f"Settings(url={self.url!r}, key='***')"
+
+def _find_dotenv(start: Path) -> Path | None:
+    return next((p / ".env" for p in (start, *start.parents) if (p / ".env").is_file()), None)
+
+
+def _read_dotenv(path: Path | None) -> dict[str, str]:
+    if not path or not path.is_file():
+        return {}
+    values = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            values[key.strip()] = value.strip().strip("\"'")
+    return values

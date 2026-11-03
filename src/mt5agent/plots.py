@@ -1,4 +1,3 @@
-"""Charts (optional extra: ``pip install "mt5-agent-backtester[plot]"``)."""
 from __future__ import annotations
 
 import matplotlib
