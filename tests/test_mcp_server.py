@@ -16,7 +16,7 @@ def rpc(server, method, params=None, mid=1):
 def test_initialize_and_list(client):
     s = _server(client)
     init = rpc(s, "initialize")["result"]
-    assert init["serverInfo"]["name"] == "ai-agent-backtester"
+    assert init["serverInfo"]["name"] == "mt5-agent-backtester"
     names = [t["name"] for t in rpc(s, "tools/list")["result"]["tools"]]
     assert names == ["list_experts", "expert_inputs", "run_backtest", "run_optimization", "run_walk_forward"]
     assert not any(n.startswith("trade") for n in names)

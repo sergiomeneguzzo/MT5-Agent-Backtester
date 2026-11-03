@@ -1,23 +1,23 @@
 <p align="center">
-  <img src="docs/images/banner.svg" alt="AI-Agent-Backtester" width="100%">
+  <img src="docs/images/banner.svg" alt="MT5-Agent-Backtester" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/sergiomeneguzzo/AI-Agent-Backtester/actions/workflows/ci.yml"><img src="https://github.com/sergiomeneguzzo/AI-Agent-Backtester/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/sergiomeneguzzo/MT5-Agent-Backtester/actions/workflows/ci.yml"><img src="https://github.com/sergiomeneguzzo/MT5-Agent-Backtester/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+">
   <img src="https://img.shields.io/badge/MetaTrader%205-build%206230%2B-1f6feb" alt="MetaTrader 5 build 6230+">
   <img src="https://img.shields.io/badge/dependencies-0-3fb950" alt="zero dependencies">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT"></a>
 </p>
 
-**AI-Agent-Backtester** lets you run backtests, optimizations and walk-forward analysis in the real
+**MT5-Agent-Backtester** lets you run backtests, optimizations and walk-forward analysis in the real
 MetaTrader 5 Strategy Tester from Python, from the terminal or from an AI agent such as Claude Code or Cursor.
 
 It talks to the MCP server that ships inside MetaTrader 5 (build 6230+) and exposes **backtesting only**:
 the tools that send real orders are blocked, so an agent can research strategies on your machine without
 being able to trade.
 
-<p align="center"><img src="docs/images/agent-session.svg" alt="An agent testing an EA through AI-Agent-Backtester" width="100%"></p>
+<p align="center"><img src="docs/images/agent-session.svg" alt="An agent testing an EA through MT5-Agent-Backtester" width="100%"></p>
 
 ---
 
@@ -58,7 +58,7 @@ Copy the key, then **restart MetaTrader 5** (a new key is only accepted after a 
 **2. Install**
 
 ```bash
-pip install "ai-agent-backtester[plot] @ git+https://github.com/sergiomeneguzzo/AI-Agent-Backtester"
+pip install "mt5-agent-backtester[plot] @ git+https://github.com/sergiomeneguzzo/MT5-Agent-Backtester"
 ```
 
 The `[plot]` extra adds charts. Leave it out if you only need the numbers.
@@ -327,8 +327,8 @@ def charts(ctx: Context) -> None:
 ## Development
 
 ```bash
-git clone https://github.com/sergiomeneguzzo/AI-Agent-Backtester
-cd AI-Agent-Backtester
+git clone https://github.com/sergiomeneguzzo/MT5-Agent-Backtester
+cd MT5-Agent-Backtester
 pip install -e ".[dev]"
 pytest -q
 ```

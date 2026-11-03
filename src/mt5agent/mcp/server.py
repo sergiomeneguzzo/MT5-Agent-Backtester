@@ -12,7 +12,7 @@ from ..tester import Tester
 from .tools import TOOLS
 
 PROTOCOL_VERSION = "2025-06-18"
-SERVER_NAME = "ai-agent-backtester"
+SERVER_NAME = "mt5-agent-backtester"
 INSTRUCTIONS = "Backtest-only access to the MetaTrader 5 Strategy Tester. No trading tools are exposed."
 
 INVALID_REQUEST = -32600

@@ -5,7 +5,7 @@
   <circle cx="1216" cy="80" r="4" fill="#3fb950"/>
   <line x1="760" y1="212" x2="1216" y2="212" stroke="#21262d" stroke-width="1"/>
   <g font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-    <text x="72" y="132" fill="#f0f6fc" font-size="52" font-weight="700" letter-spacing="-0.5">AI-Agent-Backtester</text>
+    <text x="72" y="132" fill="#f0f6fc" font-size="52" font-weight="700" letter-spacing="-0.5">MT5-Agent-Backtester</text>
     <text x="74" y="176" fill="#8b949e" font-size="21">Backtest-only MCP tools for the MetaTrader 5 Strategy Tester</text>
   </g>
 </svg>

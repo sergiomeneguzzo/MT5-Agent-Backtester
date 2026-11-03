@@ -112,7 +112,7 @@ def agent_session(stats: dict, yearly: dict, opt) -> None:
         f"      Only {profitable} of 60 combinations make money and the best one (PF {best['Profit Factor']:.2f})"
         " is\n      in-sample. Next step: a walk-forward to check whether any of it survives\n"
         "      out-of-sample. [#8b949e]No orders were sent — trade_* tools are not exposed.[/]")
-    con.save_svg(str(OUT / "agent-session.svg"), title="Claude Code + AI-Agent-Backtester")
+    con.save_svg(str(OUT / "agent-session.svg"), title="Claude Code + MT5-Agent-Backtester")
 
 
 def load_walk_forward(path: Path) -> WalkForwardResult:
