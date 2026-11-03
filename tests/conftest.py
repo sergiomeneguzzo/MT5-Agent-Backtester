@@ -109,6 +109,13 @@ class FakeMT5:
             return {"workspace": {"mql5_folder": r"C:\MT5\MQL5"},
                     "compiler": {"compiler_mql5_build": 6230},
                     "capabilities": {"can_run_backtest": True}}
+        if name == "get_expert_advisor_parameters":
+            return {"name": "Moving Average", "parameters": [
+                {"index": 0, "name": "MaximumRisk", "type": "double", "value": "0.02"},
+                {"index": 1, "name": "DecreaseFactor", "type": "double", "value": "3.0"},
+                {"index": 2, "name": "MovingPeriod", "type": "int", "value": "12"},
+                {"index": 3, "name": "MovingShift", "type": "int", "value": "6"},
+            ]}
         if name in ("tester_prepare_config", "tester_prepare_inputs"):
             return {"ok": True, "path": args["output_path"]}
         if name in ("tester_run_backtest", "tester_run_optimization"):

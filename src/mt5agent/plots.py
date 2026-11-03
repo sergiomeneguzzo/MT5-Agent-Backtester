@@ -4,6 +4,7 @@ import math
 
 import matplotlib.dates as mdates
 from matplotlib.figure import Figure
+from matplotlib.transforms import blended_transform_factory
 
 BG, FG, GRID = "#0d1117", "#c9d1d9", "#21262d"
 UP, DOWN, ACCENT, MUTED = "#3fb950", "#f85149", "#58a6ff", "#8b949e"
@@ -76,7 +77,8 @@ def plot_walk_forward(wf, path: str, title: str = "Walk-forward: stitched out-of
         ax.plot(xs, ys, color=UP if ys[-1] >= ys[0] else DOWN, linewidth=1.4)
         params = ", ".join(f"{k}={v:g}" if isinstance(v, (int, float)) else f"{k}={v}"
                            for k, v in fold.best_params.items())
-        ax.annotate(params, xy=(xs[0], ys[0]), xytext=(4, 10), textcoords="offset points", color=MUTED, fontsize=8)
+        bottom_of_axes = blended_transform_factory(ax.transData, ax.transAxes)
+        ax.text(fold.fold.oos_start, 0.03, f" {params}", transform=bottom_of_axes, color=MUTED, fontsize=8, va="bottom")
     ax.axhline(wf.initial_deposit, color=MUTED, linewidth=0.8, linestyle="--")
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
     ax.set_ylabel("balance")

@@ -45,7 +45,8 @@ def test_backtest_flow(client, fake, sample_xlsx):
     cfg = dict(fake.calls)["tester_prepare_config"]
     assert cfg["mql5_program_path"] == r"C:\MT5\MQL5\Experts\Examples\Moving Average\Moving Average.ex5"
     assert cfg["timeframe"] == "H1" and cfg["from_date"] == "2020-01-01T00:00:00"
-    assert dict(fake.calls)["tester_prepare_inputs"]["parameters"] == ["MovingPeriod=20"]
+    assert dict(fake.calls)["tester_prepare_inputs"]["parameters"] == [
+        "MaximumRisk=0.02", "DecreaseFactor=3.0", "MovingPeriod=20", "MovingShift=6"]
     assert run.stats["profit_factor"] == pytest.approx(0.8815)
     assert len(run.report.trades) == 2
     # temp .ini/.set/.xlsx are cleaned up
@@ -66,15 +67,31 @@ def test_long_run_keeps_waiting(client, fake, sample_xlsx):
     assert [n for n, _ in fake.calls].count("tester_wait") == 2
 
 
-def test_only_new_bare_charts_are_closed(client, fake, sample_xlsx):
+def test_only_charts_opened_by_the_run_are_closed(client, fake, sample_xlsx):
     fake.report_bytes = sample_xlsx
     fake.charts = [{"chart_id": "1", "symbol": "XAUUSD", "experts": [{"name": "LiveEA"}]},
-                   {"chart_id": "2", "symbol": "EURUSD", "experts": [], "indicators": []}]
-    fake.charts_after_run = [{"chart_id": "3", "symbol": "EURUSD", "experts": [], "indicators": []},
-                             {"chart_id": "4", "symbol": "EURUSD", "experts": [{"name": "X"}]}]
+                   {"chart_id": "2", "symbol": "EURUSD", "indicators": []}]
+    tester_chart = {"title": "EURUSD,H1", "path": "C:\\MT5\\MQL5\\Profiles\\Charts\\Default\\chart02.chr",
+                    "chart_id": "3", "symbol": "EURUSD", "period": "H1", "description": "Euro vs US Dollar",
+                    "digits": 5, "custom": False,
+                    "indicators": [{"window": 0, "name": "Moving Average", "short_name": "MA(10)"}]}
+    fake.charts_after_run = [tester_chart,
+                             {"chart_id": "4", "symbol": "EURUSD", "description": "x", "experts": [{"name": "X"}]},
+                             {"chart_id": "6", "symbol": "EURUSD", "expert_advisor": {"name": "Y"}},
+                             {"chart_id": "5", "symbol": "GBPUSD", "indicators": []}]
     Tester(client).backtest("X", "EURUSD", "H1", "2020-01-01", "2021-01-01")
     closed = [a["chart_id"] for n, a in fake.calls if n == "chart_close"]
-    assert closed == ["3"]          # pre-existing (1, 2) and EA charts (4) untouched
+    assert closed == ["3"]
+
+
+def test_backtest_without_inputs_uses_the_ea_defaults(client, fake, sample_xlsx):
+    fake.report_bytes = sample_xlsx
+    tester = Tester(client)
+    tester.backtest("X", "EURUSD", "H1", "2020-01-01", "2021-01-01")
+    tester.backtest("X", "EURUSD", "H1", "2020-01-01", "2021-01-01")
+    sets = [a["parameters"] for n, a in fake.calls if n == "tester_prepare_inputs"]
+    assert sets[0] == sets[1] == ["MaximumRisk=0.02", "DecreaseFactor=3.0", "MovingPeriod=12", "MovingShift=6"]
+    assert [n for n, _ in fake.calls].count("get_expert_advisor_parameters") == 1
 
 
 def test_optimize_flow(client, fake, optimization_xml):
@@ -125,7 +142,7 @@ def test_walk_forward_end_to_end(client, fake, optimization_xml, sample_xlsx, mo
     assert len(wf.folds) == 2
     assert wf.folds[0].best_params == {"MovingPeriod": 80, "MovingShift": 6}
     oos_inputs = [a["parameters"] for n, a in fake.calls if n == "tester_prepare_inputs"][1]
-    assert oos_inputs == ["MaximumRisk=0.02", "MovingPeriod=80", "MovingShift=6"]
+    assert oos_inputs == ["MaximumRisk=0.02", "DecreaseFactor=3.0", "MovingPeriod=80", "MovingShift=6"]
     s = wf.summary()
     assert s["folds"] == 2 and s["trades"] == 4
 

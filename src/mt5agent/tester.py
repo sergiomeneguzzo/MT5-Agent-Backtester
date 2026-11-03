@@ -72,6 +72,7 @@ class Tester:
         self.prefix = prefix
         self.keep_files = keep_files
         self.close_charts = close_charts
+        self._defaults: dict[str, dict[str, str]] = {}
 
     def experts(self, filter: str = "") -> list[dict]:
         reply = self.mt5.call("list_available_mql5_programs", {"filter": filter, "program_type": "expert"})
@@ -79,6 +80,13 @@ class Tester:
 
     def expert_inputs(self, expert: str) -> dict:
         return self.mt5.call("get_expert_advisor_parameters", {"expert_path": self.expert_path(expert)})
+
+    def default_inputs(self, expert: str) -> dict[str, str]:
+        path = self.expert_path(expert)
+        if path not in self._defaults:
+            parameters = self.expert_inputs(expert).get("parameters", [])
+            self._defaults[path] = {p["name"]: p["value"] for p in parameters if p.get("type") != "group"}
+        return dict(self._defaults[path])
 
     def expert_path(self, expert: str) -> str:
         if ":" in expert:
@@ -98,7 +106,7 @@ class Tester:
         started = time.monotonic()
         config = self._config(expert, symbol, timeframe, start, end, model, deposit, leverage,
                               deposit_currency=currency, execution_delay=delay_ms)
-        with self._job() as temp:
+        with self._job(symbol) as temp:
             run_id = self._run("tester_run_backtest", expert, config, inputs, temp, timeout)
             stats = self.mt5.call("tester_get_report", {"run_id": run_id})
             raw = self._download_report(run_id, "xlsx", temp) if detailed else b""
@@ -118,7 +126,7 @@ class Tester:
                               optimization=True,
                               genetic=combinations > GENETIC_THRESHOLD if genetic is None else genetic,
                               optimization_criterion=CRITERIA.get(criterion, criterion))
-        with self._job() as temp:
+        with self._job(symbol) as temp:
             run_id = self._run("tester_run_optimization", expert, config, inputs, temp, timeout)
             raw = self._download_report(run_id, "xml", temp)
         config["inputs"] = {k: (vars(v) if isinstance(v, Range) else v) for k, v in inputs.items()}
@@ -172,14 +180,14 @@ class Tester:
     def _run(self, tool: str, expert: str, config: dict, inputs: Mapping[str, Any] | None,
              temp: list[str], timeout: float) -> str:
         ini = self._temp_path("ini", temp)
+        set_file = self._temp_path("set", temp)
         self.mt5.call("tester_prepare_config", {**config, "output_path": ini})
-        args = {"config_path": ini, "wait": True, "timeout_sec": int(min(timeout, WAIT_CHUNK))}
-        if inputs:
-            set_file = self._temp_path("set", temp)
-            self.mt5.call("tester_prepare_inputs", {"mql5_program_path": config["mql5_program_path"],
-                                                    "parameters": to_set_lines(inputs),
-                                                    "output_path": set_file})
-            args["inputs_path"] = set_file
+        self.mt5.call("tester_prepare_inputs", {"mql5_program_path": config["mql5_program_path"],
+                                                "parameters": to_set_lines({**self.default_inputs(expert),
+                                                                            **(inputs or {})}),
+                                                "output_path": set_file})
+        args = {"config_path": ini, "inputs_path": set_file, "wait": True,
+                "timeout_sec": int(min(timeout, WAIT_CHUNK))}
         reply = self.mt5.call(tool, args)
         return self._wait(reply, timeout)
 
@@ -205,7 +213,7 @@ class Tester:
         return path
 
     @contextmanager
-    def _job(self) -> Iterator[list[str]]:
+    def _job(self, symbol: str) -> Iterator[list[str]]:
         charts_before = self._chart_ids() if self.close_charts else None
         temp: list[str] = []
         try:
@@ -215,13 +223,13 @@ class Tester:
                 for path in temp:
                     self._try("delete_file", {"path": path})
             if charts_before is not None:
-                self.close_new_charts(charts_before)
+                self.close_new_charts(charts_before, symbol)
 
-    def close_new_charts(self, existing: set[str]) -> int:
+    def close_new_charts(self, existing: set[str], symbol: str) -> int:
         closed = 0
         for chart in self._charts() or []:
             chart_id = _chart_id(chart)
-            if chart_id and chart_id not in existing and _is_bare(chart):
+            if chart_id and chart_id not in existing and _is_tester_chart(chart, symbol):
                 closed += self._try("chart_close", {"chart_id": chart_id})
         return closed
 
@@ -247,9 +255,13 @@ def _chart_id(chart: dict) -> str:
     return str(chart.get("chart_id", chart.get("id", "")))
 
 
-def _is_bare(chart: dict) -> bool:
-    attached = ("expert", "robot", "indicator", "script")
-    return not any(value and any(word in key.lower() for word in attached) for key, value in chart.items())
+PROGRAM_KEYS = ("expert", "robot", "script")
+
+
+def _is_tester_chart(chart: dict, symbol: str) -> bool:
+    if chart.get("symbol") != symbol:
+        return False
+    return not any(value and key.lower().split("_")[0].rstrip("s") in PROGRAM_KEYS for key, value in chart.items())
 
 
 def _to_date(value: DateLike) -> date:

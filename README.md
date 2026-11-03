@@ -128,6 +128,12 @@ mt5agent walkforward "Examples/Moving Average/Moving Average" EURUSD H1 2020-01-
     -p MovingPeriod=10:100:10 -p MovingShift=0:10:2 --is-months 24 --oos-months 12 --plot walkforward.png
 ```
 
+<p align="center"><img src="docs/images/walkforward.png" alt="Walk-forward out-of-sample equity" width="100%"></p>
+
+Here the answer is clear: the parameters that looked best in each 2-year window lost money in every
+following year (out-of-sample profit factor 0.50, 0 of 4 windows profitable). The PF 1.15 of the
+optimization above was curve fitting, and the walk-forward is what shows it.
+
 > The numbers in these images are a real run of the sample EA (EURUSD H1, 2020–2025, open prices).
 > It loses money, which is what makes it a useful example.
 
