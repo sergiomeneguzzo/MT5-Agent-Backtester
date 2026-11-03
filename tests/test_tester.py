@@ -128,3 +128,25 @@ def test_walk_forward_end_to_end(client, fake, optimization_xml, sample_xlsx, mo
     assert oos_inputs == ["MaximumRisk=0.02", "MovingPeriod=80", "MovingShift=6"]
     s = wf.summary()
     assert s["folds"] == 2 and s["trades"] == 4
+
+
+def test_no_chart_is_closed_when_the_first_snapshot_fails(client, fake, sample_xlsx, monkeypatch):
+    from mt5agent.errors import MT5Error
+
+    fake.report_bytes = sample_xlsx
+    fake.charts = [{"chart_id": "1", "symbol": "EURUSD", "experts": [], "indicators": []}]
+    original, calls = fake.tool, {"n": 0}
+
+    def flaky(name, args):
+        if name == "list_open_charts":
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise MT5Error("temporary failure")
+        return original(name, args)
+
+    monkeypatch.setattr(fake, "tool", flaky)
+    try:
+        Tester(client).backtest("X", "EURUSD", "H1", "2020-01-01", "2021-01-01")
+    except MT5Error:
+        pass
+    assert "chart_close" not in [n for n, _ in fake.calls]

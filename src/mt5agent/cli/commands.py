@@ -82,34 +82,33 @@ def doctor(ctx: Context) -> None:
         "can_run_optimization": workspace.get("capabilities", {}).get("can_run_optimization"),
         "trading_tools": "ALLOWED" if ctx.client.allow_trading else "blocked",
     }
-    ctx.out.json(info) if ctx.out.as_json else ctx.out.pairs(info, ("check", "value"))
+    ctx.out.emit(info, lambda: ctx.out.pairs(info, ("check", "value")))
 
 
 @command("tools", "list the MCP tools exposed by the terminal (trade_* hidden)")
 def tools(ctx: Context) -> None:
     items = ctx.client.tools()
-    if ctx.out.as_json:
-        return ctx.out.json([t["name"] for t in items])
-    for t in items:
-        print(f"{t['name']:<40} {ctx.out.paint(t.get('description', '')[:70], DIM)}")
-    ctx.out.line(f"\n{len(items)} tools ({'/'.join(TRADING_PREFIXES)}* hidden)", DIM)
+
+    def render() -> None:
+        for t in items:
+            print(f"{t['name']:<40} {ctx.out.paint(t.get('description', '')[:70], DIM)}")
+        ctx.out.line(f"\n{len(items)} tools ({'/'.join(TRADING_PREFIXES)}* hidden)", DIM)
+
+    ctx.out.emit([t["name"] for t in items], render)
 
 
 @command("experts", "list compiled Expert Advisors", arg("--filter", default=""))
 def experts(ctx: Context) -> None:
     programs = ctx.tester.experts(ctx.args.filter)
-    if ctx.out.as_json:
-        return ctx.out.json(programs)
-    ctx.out.table(("expert", "build time"), [(p["name"], p.get("build_time", "")) for p in programs])
+    ctx.out.emit(programs, lambda: ctx.out.table(("expert", "build time"),
+                                                 [(p["name"], p.get("build_time", "")) for p in programs]))
 
 
 @command("inputs", "show the inputs of an Expert Advisor", arg("expert"))
 def inputs(ctx: Context) -> None:
     info = ctx.tester.expert_inputs(ctx.args.expert)
-    if ctx.out.as_json:
-        return ctx.out.json(info)
-    ctx.out.table(("input", "type", "default"),
-                  [(p["name"], p["type"], p.get("value")) for p in info.get("parameters", [])])
+    rows = [(p["name"], p["type"], p.get("value")) for p in info.get("parameters", [])]
+    ctx.out.emit(info, lambda: ctx.out.table(("input", "type", "default"), rows, align_left=2))
 
 
 @command("backtest", "run one backtest", *run_arguments(),
@@ -119,10 +118,8 @@ def backtest(ctx: Context) -> None:
     a = ctx.args
     run = ctx.tester.backtest(a.expert, a.symbol, a.timeframe, a.start, a.end, **ctx.run_options())
     yearly = run.report.yearly_returns() if run.report else {}
-    if ctx.out.as_json:
-        ctx.out.json({"run_id": run.run_id, **run.summary(), "yearly_return_pct": _rounded(yearly)})
-    else:
-        _print_backtest(ctx.out, run.summary(), yearly)
+    ctx.out.emit({"run_id": run.run_id, **run.summary(), "yearly_return_pct": _rounded(yearly)},
+                 lambda: _print_backtest(ctx.out, run.summary(), yearly))
     if a.plot and run.report:
         from ..plots import plot_equity
         plot_equity(run.report, a.plot)
@@ -139,15 +136,16 @@ def optimize(ctx: Context) -> None:
     run = ctx.tester.optimize(a.expert, a.symbol, a.timeframe, a.start, a.end,
                               criterion=a.criterion, **ctx.run_options())
     result, top = run.result, run.result.top(a.top)
-    if ctx.out.as_json:
-        ctx.out.json({"run_id": run.run_id, "passes": run.passes, "profitable_passes": result.profitable,
-                      "params": result.params, "top": top})
-    else:
+
+    def render() -> None:
         columns = [*result.params, "Profit", "Profit Factor", "Equity DD %", "Trades"]
         ctx.out.line(f"{run.passes} passes in {run.seconds:.0f} s, top {len(top)}", BOLD)
-        ctx.out.table(columns, [[p.get(c) for c in columns] for p in top])
+        ctx.out.table(columns, [[p.get(c) for c in columns] for p in top], align_left=0)
         ctx.out.line(f"\n{result.profitable}/{run.passes} passes profitable. The best pass is in-sample, "
                      "check it with `mt5agent walkforward`.", DIM)
+
+    ctx.out.emit({"run_id": run.run_id, "passes": run.passes, "profitable_passes": result.profitable,
+                  "params": result.params, "top": top}, render)
     if a.plot and len(result.params) >= 2:
         from ..plots import plot_heatmap
         plot_heatmap(result, result.params[0], result.params[1], a.plot)
@@ -171,13 +169,9 @@ def walkforward(ctx: Context) -> None:
     wf = ctx.tester.walk_forward(a.expert, a.symbol, a.timeframe, a.start, a.end,
                                  is_months=a.is_months, oos_months=a.oos_months, anchored=a.anchored,
                                  min_trades=a.min_trades, on_fold=progress, **ctx.run_options())
-    if ctx.out.as_json:
-        ctx.out.json({"summary": wf.summary(),
-                      "folds": [{"fold": f.fold.label(), "params": f.best_params, "oos": f.oos_summary}
-                                for f in wf.folds]})
-    else:
-        print()
-        ctx.out.pairs(wf.summary(), ("out-of-sample", "value"))
+    folds = [{"fold": f.fold.label(), "params": f.best_params, "oos": f.oos_summary} for f in wf.folds]
+    ctx.out.emit({"summary": wf.summary(), "folds": folds},
+                 lambda: (print(), ctx.out.pairs(wf.summary(), ("out-of-sample", "value"))))
     if a.plot:
         from ..plots import plot_walk_forward
         plot_walk_forward(wf, a.plot)
@@ -191,9 +185,11 @@ def report(ctx: Context) -> None:
                 "inputs": parsed.inputs, **parsed.summary(),
                 "yearly_return_pct": _rounded(parsed.yearly_returns())}
     else:
+        best = parsed.best()
         data = {"title": parsed.title, "passes": len(parsed.passes), "params": parsed.params,
-                "profitable_passes": parsed.profitable, "best": parsed.best()}
-    ctx.out.json(data) if ctx.out.as_json else ctx.out.pairs(data)
+                "profitable_passes": parsed.profitable,
+                "best": {k: best.get(k) for k in (*parsed.params, "Profit Factor", "Profit", "Trades")}}
+    ctx.out.emit(data, lambda: ctx.out.pairs(data))
 
 
 def _print_backtest(out: Output, summary: dict, yearly: dict) -> None:

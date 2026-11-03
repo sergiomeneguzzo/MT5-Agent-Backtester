@@ -28,7 +28,8 @@ class Settings:
 
     @classmethod
     def from_env(cls, editor: bool = False, dotenv: str | os.PathLike | None = None) -> Settings:
-        env = {**_read_dotenv(Path(dotenv) if dotenv else _find_dotenv(Path.cwd())), **os.environ}
+        env = _read_dotenv(Path(dotenv) if dotenv else _find_dotenv(Path.cwd()))
+        env.update({k: v for k, v in os.environ.items() if v})
         url_var, key_var = (ENV_EDITOR_URL, ENV_EDITOR_KEY) if editor else (ENV_TERMINAL_URL, ENV_TERMINAL_KEY)
         key = env.get(key_var, "")
         if not key:

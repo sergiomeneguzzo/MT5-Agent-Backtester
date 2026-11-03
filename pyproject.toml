@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "mt5-agent-backtester"
-version = "0.1.0"
+dynamic = ["version"]
 description = "MT5 Strategy Tester for AI agents: backtests, optimizations and walk-forward via MCP. No trading tools, zero dependencies."
 readme = "README.md"
 license = "MIT"
@@ -19,7 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Office/Business :: Financial :: Investment",
 ]
-dependencies = []  # core is standard-library only
+dependencies = []
 
 [project.optional-dependencies]
 plot = ["matplotlib>=3.7", "pandas>=2.0"]
@@ -33,11 +33,15 @@ mt5agent-mcp = "mt5agent.mcp:main"
 Homepage = "https://github.com/sergiomeneguzzo/MT5-Agent-Backtester"
 Issues = "https://github.com/sergiomeneguzzo/MT5-Agent-Backtester/issues"
 
+[tool.hatch.version]
+path = "src/mt5agent/_version.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/mt5agent"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_classes = []
 
 [tool.ruff]
 line-length = 120

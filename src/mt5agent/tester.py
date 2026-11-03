@@ -66,8 +66,6 @@ class OptimizationRun:
 
 
 class Tester:
-    __test__ = False
-
     def __init__(self, client: MT5Client, *, prefix: str = FILE_PREFIX,
                  keep_files: bool = False, close_charts: bool = True):
         self.mt5 = client
@@ -219,20 +217,21 @@ class Tester:
 
     def close_new_charts(self, existing: set[str]) -> int:
         closed = 0
-        for chart in self._charts():
+        for chart in self._charts() or []:
             chart_id = _chart_id(chart)
             if chart_id and chart_id not in existing and _is_bare(chart):
                 closed += self._try("chart_close", {"chart_id": chart_id})
         return closed
 
-    def _charts(self) -> list[dict]:
+    def _charts(self) -> list[dict] | None:
         try:
             return self.mt5.call("list_open_charts").get("charts", [])
         except MT5Error:
-            return []
+            return None
 
-    def _chart_ids(self) -> set[str]:
-        return {_chart_id(c) for c in self._charts()}
+    def _chart_ids(self) -> set[str] | None:
+        charts = self._charts()
+        return None if charts is None else {_chart_id(c) for c in charts}
 
     def _try(self, tool: str, args: dict) -> bool:
         try:

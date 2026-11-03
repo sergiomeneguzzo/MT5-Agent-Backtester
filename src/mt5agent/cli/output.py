@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from typing import Any
 
 GREEN, RED, DIM, BOLD, RESET = "\033[32m", "\033[31m", "\033[2m", "\033[1m", "\033[0m"
@@ -13,8 +13,11 @@ class Output:
         self.as_json = as_json
         self.color = (sys.stdout.isatty() and not as_json) if color is None else color
 
-    def json(self, data: Any) -> None:
-        print(json.dumps(data, indent=2, default=str))
+    def emit(self, data: Any, render: Callable[[], None]) -> None:
+        if self.as_json:
+            print(json.dumps(data, indent=2, default=str))
+        else:
+            render()
 
     def line(self, text: str = "", style: str = "") -> None:
         print(self.paint(text, style))
@@ -25,16 +28,28 @@ class Output:
     def signed(self, value: float, text: str | None = None) -> str:
         return self.paint(text or f"{value:+.2f}", GREEN if value >= 0 else RED)
 
-    def table(self, header: Sequence[str], rows: Iterable[Sequence[Any]]) -> None:
-        cells = [list(map(str, header))] + [["" if v is None else str(v) for v in row] for row in rows]
+    def table(self, header: Sequence[str], rows: Iterable[Sequence[Any]], align_left: int = 1) -> None:
+        cells = [list(map(str, header))] + [[_format(v) for v in row] for row in rows]
         widths = [max(_visible_len(row[i]) for row in cells) for i in range(len(header))]
         for n, row in enumerate(cells):
-            print("  ".join(_pad(value, width, left=i == 0) for i, (value, width) in enumerate(zip(row, widths))))
+            print("  ".join(_pad(v, w, left=i < align_left) for i, (v, w) in enumerate(zip(row, widths))).rstrip())
             if n == 0:
                 print("  ".join("─" * w for w in widths))
 
     def pairs(self, data: dict, header: tuple[str, str] = ("field", "value")) -> None:
-        self.table(header, data.items())
+        self.table(header, data.items(), align_left=2)
+
+
+def _format(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, dict):
+        return ", ".join(f"{k}={_format(v)}" for k, v in value.items())
+    if isinstance(value, (list, tuple)):
+        return ", ".join(map(_format, value))
+    if isinstance(value, float):
+        return f"{value:g}"
+    return str(value)
 
 
 def _visible_len(text: str) -> int:

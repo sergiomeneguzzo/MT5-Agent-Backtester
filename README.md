@@ -260,6 +260,7 @@ client = MT5Client(Settings(url="http://127.0.0.1:22346/mcp", key="..."))
 | `401 Unauthorized` | the key is wrong, or you generated a new one and haven't restarted MetaTrader 5 |
 | an error about the `.ex5` path | the EA path is wrong: run `mt5agent experts` to see the exact names |
 | a test takes longer than expected | real-tick tests on many years are slow, so try `--model "open prices"` first |
+| the agent gives up on a long optimization | raise the MCP tool timeout of your client, or shorten the period / grid |
 
 ---
 
@@ -333,7 +334,7 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
-The 38 tests run without MetaTrader 5: a fake server replays real Strategy Tester output.
+The tests run without MetaTrader 5: a fake server replays real Strategy Tester output.
 `docs/run_demo.py` and `docs/make_images.py` regenerate the images in this README from a live terminal.
 
 **Roadmap**: multi-symbol portfolios, Monte Carlo on out-of-sample trades, compiling `.mq5` before testing,
